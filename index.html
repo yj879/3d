@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Asset Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            padding: 30px;
+        }
+        
+        .model-viewer {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f5f5f5;
+        }
+        
+        .canvas-container {
+            width: 100%;
+            height: 500px;
+            position: relative;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .model-info {
+            padding: 20px;
+            background: white;
+        }
+        
+        .model-info h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .model-info p {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            font-size: 0.95em;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 10px 15px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #764ba2;
+        }
+        
+        button:active {
+            transform: scale(0.98);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+        
+        .error {
+            color: #d32f2f;
+            padding: 10px;
+            background: #ffebee;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 WebGL Asset Viewer</h1>
+            <p>3D 모델을 인터랙티브하게 감상하세요</p>
+        </div>
+        
+        <div class="content">
+            <!-- Model 1 -->
+            <div class="model-viewer">
+                <div class="canvas-container" id="canvas1-container">
+                    <canvas id="canvas1"></canvas>
+                </div>
+                <div class="model-info">
+                    <h3>📦 모델 1</h3>
+                    <p id="model1-status" class="loading">로딩 중...</p>
+                    <div class="controls">
+                        <button onclick="resetCamera(1)">카메라 리셋</button>
+                        <button onclick="toggleRotation(1)">회전 토글</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Model 2 -->
+            <div class="model-viewer">
+                <div class="canvas-container" id="canvas2-container">
+                    <canvas id="canvas2"></canvas>
+                </div>
+                <div class="model-info">
+                    <h3>📦 모델 2</h3>
+                    <p id="model2-status" class="loading">로딩 중...</p>
+                    <div class="controls">
+                        <button onclick="resetCamera(2)">카메라 리셋</button>
+                        <button onclick="toggleRotation(2)">회전 토글</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        const models = {
+            1: {
+                canvas: null,
+                scene: null,
+                camera: null,
+                renderer: null,
+                controls: null,
+                model: null,
+                rotating: true,
+                assetPath: 'assets/model1.glb'
+            },
+            2: {
+                canvas: null,
+                scene: null,
+                camera: null,
+                renderer: null,
+                controls: null,
+                model: null,
+                rotating: true,
+                assetPath: 'assets/model2.glb'
+            }
+        };
+
+        function initScene(modelId) {
+            const m = models[modelId];
+            
+            // Canvas 설정
+            m.canvas = document.getElementById(`canvas${modelId}`);
+            const container = document.getElementById(`canvas${modelId}-container`);
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            // Scene 설정
+            m.scene = new THREE.Scene();
+            m.scene.background = new THREE.Color(0xf5f7fa);
+
+            // Camera 설정
+            m.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+            m.camera.position.set(0, 0, 5);
+
+            // Renderer 설정
+            m.renderer = new THREE.WebGLRenderer({ canvas: m.canvas, antialias: true, alpha: true });
+            m.renderer.setSize(width, height);
+            m.renderer.setPixelRatio(window.devicePixelRatio);
+            m.renderer.shadowMap.enabled = true;
+
+            // 조명 설정
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            m.scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(5, 10, 7);
+            directionalLight.castShadow = true;
+            m.scene.add(directionalLight);
+
+            // OrbitControls 설정
+            m.controls = new THREE.OrbitControls(m.camera, m.renderer.domElement);
+            m.controls.enableDamping = true;
+            m.controls.dampingFactor = 0.05;
+            m.controls.autoRotate = m.rotating;
+            m.controls.autoRotateSpeed = 5;
+
+            // 모델 로드
+            loadModel(modelId);
+
+            // 애니메이션 루프
+            function animate() {
+                requestAnimationFrame(animate);
+                m.controls.update();
+                m.renderer.render(m.scene, m.camera);
+            }
+            animate();
+
+            // 윈도우 리사이즈 처리
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                const newHeight = container.clientHeight;
+                m.camera.aspect = newWidth / newHeight;
+                m.camera.updateProjectionMatrix();
+                m.renderer.setSize(newWidth, newHeight);
+            });
+        }
+
+        function loadModel(modelId) {
+            const m = models[modelId];
+            const statusEl = document.getElementById(`model${modelId}-status`);
+            
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+                m.assetPath,
+                (gltf) => {
+                    m.model = gltf.scene;
+                    
+                    // 모델 크기 조정
+                    const box = new THREE.Box3().setFromObject(m.model);
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 4 / maxDim;
+                    m.model.scale.multiplyScalar(scale);
+                    
+                    // 모델 중앙 정렬
+                    const center = box.getCenter(new THREE.Vector3());
+                    m.model.position.x += (m.model.position.x - center.x) * scale;
+                    m.model.position.y += (m.model.position.y - center.y) * scale;
+                    m.model.position.z += (m.model.position.z - center.z) * scale;
+                    
+                    m.scene.add(m.model);
+                    
+                    // 카메라 위치 조정
+                    m.camera.position.z = 6;
+                    m.controls.target.set(0, 0, 0);
+                    m.controls.update();
+                    
+                    statusEl.innerHTML = `✅ 모델 로드 완료<br><small>${m.assetPath}</small>`;
+                    statusEl.classList.remove('loading');
+                },
+                (progress) => {
+                    const percent = Math.round((progress.loaded / progress.total) * 100);
+                    statusEl.innerHTML = `📥 로딩 중... ${percent}%`;
+                },
+                (error) => {
+                    console.error('모델 로드 실패:', error);
+                    statusEl.innerHTML = `<span class="error">❌ 로드 실패: ${m.assetPath}<br><small>${error.message}</small></span>`;
+                    statusEl.classList.remove('loading');
+                }
+            );
+        }
+
+        function resetCamera(modelId) {
+            const m = models[modelId];
+            m.camera.position.set(0, 0, 6);
+            m.controls.target.set(0, 0, 0);
+            m.controls.update();
+        }
+
+        function toggleRotation(modelId) {
+            const m = models[modelId];
+            m.rotating = !m.rotating;
+            m.controls.autoRotate = m.rotating;
+        }
+
+        // 초기화
+        window.addEventListener('load', () => {
+            initScene(1);
+            initScene(2);
+        });
+    </script>
+</body>
+</html>
