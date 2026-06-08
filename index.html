@@ -184,11 +184,20 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@r128/examples/js/controls/OrbitControls.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@r128/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@r128/examples/jsm/"
+        }
+    }
+    </script>
 
-    <script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
         const models = {
             1: {
                 canvas: null,
@@ -215,27 +224,22 @@
         function initScene(modelId) {
             const m = models[modelId];
             
-            // Canvas 설정
             m.canvas = document.getElementById(`canvas${modelId}`);
             const container = document.getElementById(`canvas${modelId}-container`);
             const width = container.clientWidth;
             const height = container.clientHeight;
 
-            // Scene 설정
             m.scene = new THREE.Scene();
             m.scene.background = new THREE.Color(0xf5f7fa);
 
-            // Camera 설정
             m.camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
             m.camera.position.set(0, 0, 5);
 
-            // Renderer 설정
             m.renderer = new THREE.WebGLRenderer({ canvas: m.canvas, antialias: true, alpha: true });
             m.renderer.setSize(width, height);
             m.renderer.setPixelRatio(window.devicePixelRatio);
             m.renderer.shadowMap.enabled = true;
 
-            // 조명 설정
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
             m.scene.add(ambientLight);
 
@@ -244,17 +248,14 @@
             directionalLight.castShadow = true;
             m.scene.add(directionalLight);
 
-            // OrbitControls 설정
-            m.controls = new THREE.OrbitControls(m.camera, m.renderer.domElement);
+            m.controls = new OrbitControls(m.camera, m.renderer.domElement);
             m.controls.enableDamping = true;
             m.controls.dampingFactor = 0.05;
             m.controls.autoRotate = m.rotating;
             m.controls.autoRotateSpeed = 5;
 
-            // 모델 로드
             loadModel(modelId);
 
-            // 애니메이션 루프
             function animate() {
                 requestAnimationFrame(animate);
                 m.controls.update();
@@ -262,7 +263,6 @@
             }
             animate();
 
-            // 윈도우 리사이즈 처리
             window.addEventListener('resize', () => {
                 const newWidth = container.clientWidth;
                 const newHeight = container.clientHeight;
@@ -276,21 +276,19 @@
             const m = models[modelId];
             const statusEl = document.getElementById(`model${modelId}-status`);
             
-            const loader = new THREE.GLTFLoader();
+            const loader = new GLTFLoader();
             
             loader.load(
                 m.assetPath,
                 (gltf) => {
                     m.model = gltf.scene;
                     
-                    // 모델 크기 조정
                     const box = new THREE.Box3().setFromObject(m.model);
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     const scale = 4 / maxDim;
                     m.model.scale.multiplyScalar(scale);
                     
-                    // 모델 중앙 정렬
                     const center = box.getCenter(new THREE.Vector3());
                     m.model.position.x += (m.model.position.x - center.x) * scale;
                     m.model.position.y += (m.model.position.y - center.y) * scale;
@@ -298,7 +296,6 @@
                     
                     m.scene.add(m.model);
                     
-                    // 카메라 위치 조정
                     m.camera.position.z = 6;
                     m.controls.target.set(0, 0, 0);
                     m.controls.update();
@@ -318,20 +315,19 @@
             );
         }
 
-        function resetCamera(modelId) {
+        window.resetCamera = function(modelId) {
             const m = models[modelId];
             m.camera.position.set(0, 0, 6);
             m.controls.target.set(0, 0, 0);
             m.controls.update();
-        }
+        };
 
-        function toggleRotation(modelId) {
+        window.toggleRotation = function(modelId) {
             const m = models[modelId];
             m.rotating = !m.rotating;
             m.controls.autoRotate = m.rotating;
-        }
+        };
 
-        // 초기화
         window.addEventListener('load', () => {
             initScene(1);
             initScene(2);
