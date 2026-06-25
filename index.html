@@ -1351,7 +1351,7 @@ function buildModel() {
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
 // BUILT-IN GLB ASSETS
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
-const builtinGLBModels = { icon: null, chat: null };
+const builtinGLBModels = { icon: null, chat: null, bell: null };
 const ICON_GLB_B64 = null;
 const CHAT_GLB_B64 = null;
 
@@ -1870,6 +1870,7 @@ function buildGLBAsset(name) {
     applyShadeSmooth();
     applyGLBMeshDefaults(name);
     if (name === 'bell' && currentMaterial === 'hdri') fixBellHDRISides(clone);
+    if (name === 'bell') setZoom(0.75);
     updateBellMatPanel(); updateDotMatPanel();
     if (name === 'bell') applyBellMat();
     if (name === 'chat') applyDotMaterial();
@@ -1889,6 +1890,7 @@ function buildGLBAsset(name) {
     applyShadeSmooth();
     applyGLBMeshDefaults(name);
     if (name === 'bell' && currentMaterial === 'hdri') fixBellHDRISides(clone);
+    if (name === 'bell') setZoom(0.75);
     updateBellMatPanel(); updateDotMatPanel();
     if (name === 'bell') applyBellMat();
     if (name === 'chat') applyDotMaterial();
@@ -2775,9 +2777,37 @@ async function exportGIF() {
 }
 
 async function exportAPNG() {
+  const btn = document.querySelector('.export-btn[onclick="exportAPNG()"]');
+
+  // 진행 오버레이 표시
+  let overlay = document.getElementById('apngProgressOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'apngProgressOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+    overlay.innerHTML = `
+      <div style="color:#fff;font-size:14px;letter-spacing:.08em;" id="apngProgressText">프레임 캡처 중...</div>
+      <div style="width:260px;height:6px;background:#333;border-radius:4px;overflow:hidden;">
+        <div id="apngProgressBar" style="height:100%;background:#8b7fff;width:0%;transition:width .1s;border-radius:4px;"></div>
+      </div>
+      <div style="color:#888;font-size:12px;" id="apngProgressSub">0 / 0</div>
+    `;
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+
+  const setProgress = (text, pct, sub) => {
+    document.getElementById('apngProgressText').textContent = text;
+    document.getElementById('apngProgressBar').style.width = pct + '%';
+    document.getElementById('apngProgressSub').textContent = sub;
+  };
+
+  await loadScript('https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js');
+  await new Promise(r => setTimeout(r, 100));
+
   const frames = parseInt(document.getElementById('frameCount').value);
   const delay = parseInt(document.getElementById('frameDelay').value);
-  const sz = Math.min(getExportSize(), 512);
+  const sz = Math.min(getExportSize(), 256);
 
   const offCanvas = document.createElement('canvas');
   offCanvas.width = sz; offCanvas.height = sz;
@@ -2794,9 +2824,9 @@ async function exportAPNG() {
   offCamera.aspect = 1;
   offCamera.updateProjectionMatrix();
 
-  // Collect frames as ImageData
-  const frameDataArr = [];
+  const imgs = [];
   for (let i = 0; i < frames; i++) {
+    setProgress('프레임 캡처 중', Math.round((i / frames) * 80), `${i + 1} / ${frames}`);
     const angle = (i / frames) * Math.PI * 2;
     const r = 4.0 / cameraZoom;
     offCamera.position.x = r * Math.sin(angle) * Math.cos(rotX);
@@ -2804,33 +2834,15 @@ async function exportAPNG() {
     offCamera.position.z = r * Math.cos(angle) * Math.cos(rotX);
     offCamera.lookAt(0, 0, 0);
     offRenderer.render(scene, offCamera);
-    const ctx2d = document.createElement('canvas');
-    ctx2d.width = sz; ctx2d.height = sz;
-    ctx2d.getContext('2d').drawImage(offCanvas, 0, 0);
-    frameDataArr.push(ctx2d.toDataURL('image/png'));
-    await new Promise(r => setTimeout(r, 8));
-  }
-
-  // For APNG: use a simple approach \'97 export as ZIP of frames with instructions
-  // True APNG encoding in pure JS is complex; we'll use a lightweight APNG encoder
-  await loadScript('https://cdn.jsdelivr.net/npm/apng-js@1.1.2/dist/apng-js.min.js');
-
-  // Since full APNG encoding is complex, export as the first frame PNG with a note
-  // and provide frames as a zip. For simplicity, we download frame sequence as data URI.
-  // Alternative: use upng-js for proper APNG
-  await loadScript('https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js');
-
-  const imgs = [];
-  for (let i = 0; i < frameDataArr.length; i++) {
-    const img = new Image();
-    img.src = frameDataArr[i];
-    await new Promise(r => { img.onload = r; });
     const c = document.createElement('canvas');
     c.width = sz; c.height = sz;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    imgs.push(ctx.getImageData(0, 0, sz, sz).data.buffer);
+    c.getContext('2d').drawImage(offCanvas, 0, 0);
+    imgs.push(c.getContext('2d').getImageData(0, 0, sz, sz).data.buffer);
+    if (i % 4 === 3) await new Promise(r => setTimeout(r, 0));
   }
+
+  setProgress('APNG 인코딩 중', 90, '잠시만요...');
+  await new Promise(r => setTimeout(r, 0));
 
   const apngBuf = UPNG.encode(imgs, sz, sz, 0, new Array(frames).fill(delay));
   const blob = new Blob([apngBuf], { type: 'image/apng' });
@@ -2839,6 +2851,10 @@ async function exportAPNG() {
   link.href = URL.createObjectURL(blob);
   link.click();
   offRenderer.dispose();
+
+  setProgress('완료!', 100, '');
+  await new Promise(r => setTimeout(r, 800));
+  overlay.style.display = 'none';
 }
 
 function loadScript(src) {
