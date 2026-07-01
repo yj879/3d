@@ -1611,29 +1611,27 @@ vec3 Ldir = normalize(vec3(-0.35, 0.85, 0.55));   // 키 라이트 (좌상단, �
 float ndl = dot(N, Ldir);
 float shade = ndl * 0.5 + 0.5;                    // 0(내부) ~ 1(정면광)
 
-// 색 램프: 내부는 진하게 → 밝은 본체
+// 색 램프: 넓게 겹치는 smoothstep으로 부드러운 연속 그라디언트 (가운데 갈라짐 방지)
 vec3 col = uDeep;
-col = mix(col, uShadow, smoothstep(0.00, 0.32, shade));
-col = mix(col, uBase,   smoothstep(0.30, 0.54, shade));
-col = mix(col, uLit,    smoothstep(0.52, 0.80, shade));
-col = mix(col, uHi,     smoothstep(0.82, 1.00, shade));
+col = mix(col, uShadow, smoothstep(0.05, 0.45, shade));
+col = mix(col, uBase,   smoothstep(0.25, 0.68, shade));
+col = mix(col, uLit,    smoothstep(0.50, 0.92, shade));
+col = mix(col, uHi,     smoothstep(0.80, 1.08, shade));
 
 // 반사광 2: 아래쪽 바운스(반사) 라이트 — 그림자 쪽만 따뜻하게 채움
 vec3 Lb = normalize(vec3(0.15, -0.8, 0.5));
 float bnc = max(dot(N, Lb), 0.0);
 float shadowMask = 1.0 - smoothstep(0.0, 0.5, ndl);
-col += uBounce * bnc * shadowMask * 0.45;
+col += uBounce * bnc * shadowMask * 0.4;
 
-// 반사광 1(광택): 이중 스페큘러 — 좁고 강한 핫스팟 + 넓은 글로시
+// 반사광(광택): 좁고 선명한 글로시 핫스팟만 (넓은 밴드 제거 → 가운데 갈라짐 방지)
 vec3 H = normalize(Ldir + Vd);
-float ndh = max(dot(N, H), 0.0);
-float spTight = pow(ndh, 90.0);
-float spWide  = pow(ndh, 20.0);
-col += vec3(1.0) * (spTight * 1.15 + spWide * 0.35);
+float sp = pow(max(dot(N, H), 0.0), 50.0);
+col += vec3(1.0) * sp * 1.0;
 
 // 프레넬 글로시 엣지(광택감)
 float fres = pow(1.0 - max(dot(N, Vd), 0.0), 3.0);
-col += uRim * fres * 0.4;
+col += uRim * fres * 0.35;
 
 outgoingLight = col;
 #include <output_fragment>`
@@ -2057,7 +2055,7 @@ function solidifyGeometry(src, t) {
 }
 
 // bell 셸(NurbsPath)에 벽 두께 적용 (모델당 1회, 캐시된 지오메트리 교체)
-const BELL_WALL_THICKNESS = 0.12;
+const BELL_WALL_THICKNESS = 0.2;
 function solidifyBellModel(model) {
   model.traverse(function(node) {
     if (node.isMesh && node.name === 'NurbsPath' && !node.geometry.userData.solidified) {
