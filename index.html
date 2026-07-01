@@ -1554,56 +1554,85 @@ outgoingLight += uRim * rim * 0.3;
   return mat;
 }
 
-// ── 플라스틱 재질용 그라디언트맵 (v2, 부드러운 클레이 톤) ──
-function makePlastic2GradientMap(c) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256; canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 256, 0);
-  const shadow = new THREE.Color(c.main).multiplyScalar(0.6);
-  const base   = new THREE.Color(c.main);
-  const light  = new THREE.Color(c.light);
-  const hi     = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.75);
-  grad.addColorStop(0.00, '#' + shadow.getHexString());
-  grad.addColorStop(0.45, '#' + base.getHexString());
-  grad.addColorStop(0.80, '#' + light.getHexString());
-  grad.addColorStop(1.00, '#' + hi.getHexString());
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 256, 1);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  return tex;
+// ── 색 명도/채도 조절 헬퍼 (lMul<1 진하게, >1 밝게 / sMul 채도) ──
+function deepenColor(hex, lMul, sMul) {
+  const col = new THREE.Color(hex);
+  const hsl = {};
+  col.getHSL(hsl);
+  col.setHSL(
+    hsl.h,
+    Math.min(1, hsl.s * sMul),
+    Math.min(0.97, Math.max(0, hsl.l * lMul))
+  );
+  return col;
 }
 
-// ── 플라스틱 2: 통통한 3D 이모지 느낌 (부드러운 큰 하이라이트 + 따뜻한 림) ──
+// ── 플라스틱 2: 통통한 3D 이모지 느낌 ──
+// MeshToonMaterial의 gradientMap은 빨강 채널만 흑백 램프로 쓰이므로,
+// 색 램프를 프래그먼트 셰이더에서 직접 계산해 outgoingLight를 덮어써서 완전 제어한다.
+//   · 내부(빛 안 받는 쪽)일수록 더 어둡고 진한 채도
+//   · 반사광 1: 선명한 글로시 스페큘러 하이라이트
+//   · 반사광 2: 아래쪽 바운스(반사) 라이트 (그림자 쪽만 따뜻하게)
 function makePlastic2Material(colorIdx) {
   const c = COLORS[colorIdx];
 
-  const gradMap = makePlastic2GradientMap(c);
   const mat = new THREE.MeshToonMaterial({
     color: new THREE.Color(c.main),
-    gradientMap: gradMap,
     side: THREE.FrontSide,
   });
 
-  const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.8).convertSRGBToLinear();
+  const toLin = (col) => col.clone().convertSRGBToLinear();
+  const uDeep   = toLin(deepenColor(c.main, 0.34, 1.6));   // 내부 최심부 (가장 진함)
+  const uShadow = toLin(deepenColor(c.main, 0.62, 1.45));  // 그림자
+  const uBase   = toLin(deepenColor(c.main, 1.0,  1.35));  // 기본
+  const uLit    = toLin(deepenColor(c.main, 1.35, 1.25));  // 밝은 본체 (채도 유지)
+  const uHi     = toLin(deepenColor(c.main, 1.7,  1.15));  // 최대 밝기 (창백해지지 않게)
+  const uRim    = toLin(new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.6));
+  const uBounce = toLin(new THREE.Color(c.light).lerp(new THREE.Color(c.main), 0.4));
 
   mat.onBeforeCompile = function(shader) {
-    shader.uniforms.uRim = { value: rimCol };
+    shader.uniforms.uDeep   = { value: uDeep };
+    shader.uniforms.uShadow = { value: uShadow };
+    shader.uniforms.uBase   = { value: uBase };
+    shader.uniforms.uLit    = { value: uLit };
+    shader.uniforms.uHi     = { value: uHi };
+    shader.uniforms.uRim    = { value: uRim };
+    shader.uniforms.uBounce = { value: uBounce };
     shader.fragmentShader = shader.fragmentShader.replace(
       'void main() {',
-      `uniform vec3 uRim;\nvoid main() {`
+      `uniform vec3 uDeep, uShadow, uBase, uLit, uHi, uRim, uBounce;\nvoid main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
-      `vec3 N  = normalize(vNormal);
-vec3 Vd = vec3(0.0, 0.0, 1.0);
-vec3 Ldir = normalize(vec3(-0.35, 0.9, 0.7));
-vec3 H    = normalize(Ldir + Vd);
-float sp  = pow(max(dot(N, H), 0.0), 14.0);
-outgoingLight += vec3(1.0) * sp * 0.9;
-float rim = pow(1.0 - max(dot(N, Vd), 0.0), 2.2);
-outgoingLight += uRim * rim * 0.4;
+      `vec3 N    = normalize(vNormal);
+vec3 Vd   = vec3(0.0, 0.0, 1.0);
+vec3 Ldir = normalize(vec3(-0.35, 0.85, 0.55));   // 키 라이트 (좌상단, 뷰공간)
+float ndl = dot(N, Ldir);
+float shade = ndl * 0.5 + 0.5;                    // 0(내부) ~ 1(정면광)
+
+// 색 램프: 내부는 진하게 → 밝은 본체
+vec3 col = uDeep;
+col = mix(col, uShadow, smoothstep(0.00, 0.32, shade));
+col = mix(col, uBase,   smoothstep(0.30, 0.54, shade));
+col = mix(col, uLit,    smoothstep(0.52, 0.80, shade));
+col = mix(col, uHi,     smoothstep(0.82, 1.00, shade));
+
+// 반사광 2: 아래쪽 바운스(반사) 라이트 — 그림자 쪽만 따뜻하게 채움
+vec3 Lb = normalize(vec3(0.15, -0.8, 0.5));
+float bnc = max(dot(N, Lb), 0.0);
+float shadowMask = 1.0 - smoothstep(0.0, 0.5, ndl);
+col += uBounce * bnc * shadowMask * 0.45;
+
+// 엣지 림(반사): 곡면 가장자리 반짝임
+float rim = pow(1.0 - max(dot(N, Vd), 0.0), 2.6);
+col += uRim * rim * 0.3;
+
+// 반사광 1: 선명한 글로시 스페큘러 하이라이트
+vec3 H = normalize(Ldir + Vd);
+float sp = pow(max(dot(N, H), 0.0), 34.0);
+col += vec3(1.0) * sp * 0.85;
+
+outgoingLight = col;
 #include <output_fragment>`
     );
   };
