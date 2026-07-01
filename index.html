@@ -1999,18 +1999,19 @@ function solidifyGeometry(src, t) {
   const Nml = (i) => [sn.getX(i), sn.getY(i), sn.getZ(i)];
 
   const pos = [], nor = [];
-  // OUTER: 원본 그대로
+  // OUTER: 바깥쪽으로 offset (두께를 밖으로 — 캐비티는 유지)
   for (let f = 0; f < triCount; f++) {
     for (let c = 0; c < 3; c++) {
       const i = gi(f, c), p = V(i), nn = Nml(i);
-      pos.push(p[0], p[1], p[2]); nor.push(nn[0], nn[1], nn[2]);
+      pos.push(p[0] + nn[0] * t, p[1] + nn[1] * t, p[2] + nn[2] * t);
+      nor.push(nn[0], nn[1], nn[2]);
     }
   }
-  // INNER: 안쪽으로 offset, 노멀 반전, 감김 반전(0,2,1)
+  // INNER: 원본 위치 유지(캐비티 그대로), 노멀 반전, 감김 반전(0,2,1)
   for (let f = 0; f < triCount; f++) {
     for (const c of [0, 2, 1]) {
       const i = gi(f, c), p = V(i), nn = Nml(i);
-      pos.push(p[0] - nn[0] * t, p[1] - nn[1] * t, p[2] - nn[2] * t);
+      pos.push(p[0], p[1], p[2]);
       nor.push(-nn[0], -nn[1], -nn[2]);
     }
   }
@@ -2039,9 +2040,10 @@ function solidifyGeometry(src, t) {
   for (const [id, c] of ecount) {
     if (c !== 1) continue;
     const [a, b] = erep.get(id);
-    const oa = V(a), ob = V(b), na = Nml(a), nb = Nml(b);
-    const ia = [oa[0]-na[0]*t, oa[1]-na[1]*t, oa[2]-na[2]*t];
-    const ib = [ob[0]-nb[0]*t, ob[1]-nb[1]*t, ob[2]-nb[2]*t];
+    const va = V(a), vb = V(b), na = Nml(a), nb = Nml(b);
+    const oa = [va[0]+na[0]*t, va[1]+na[1]*t, va[2]+na[2]*t];
+    const ob = [vb[0]+nb[0]*t, vb[1]+nb[1]*t, vb[2]+nb[2]*t];
+    const ia = va, ib = vb;
     const fn1 = nrm(crs(sub(ob,oa), sub(ib,oa)));
     pushTri(oa, ob, ib, fn1);
     const fn2 = nrm(crs(sub(ib,oa), sub(ia,oa)));
