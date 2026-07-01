@@ -569,21 +569,11 @@
         <span class="mat-dot chrome"></span> Blender 셰 이 더
       </button>
       <button class="mat-btn" onclick="setMaterial('spline')" id="mat-spline">
-        <span class="mat-dot spline"></span> 매 트
-      </button>
-      <button class="mat-btn" onclick="setMaterial('glossy')" id="mat-glossy">
-        <span class="mat-dot glossy"></span> 플 라 스 틱
+        <span class="mat-dot spline"></span> 플 라 스 틱
       </button>
       <button class="mat-btn" onclick="setMaterial('hdri')" id="mat-hdri">
         <span class="mat-dot hdri"></span> HDRI 스 튜 디 오
       </button>
-    </div>
-    <div class="panel-section" id="grainPanel" style="display:none">
-      <div class="panel-label" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>그 레 인</span><span id="grainVal" style="color:var(--muted);font-size:11px;">0.15</span>
-      </div>
-      <input type="range" id="grainSlider" min="0" max="0.6" step="0.01" value="0.15"
-        oninput="setMatteGrain(this.value)" style="width:100%;cursor:pointer;">
     </div>
     <div class="divider" id="bell-mat-divider" style="display:none"></div>
     <div class="panel-section" id="bell-mat-panel" style="display:none">
@@ -861,7 +851,6 @@
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
 let currentAsset = 'chat';
 let currentMaterial = 'glass';
-let matteGrain = 0.15;
 let currentColor = 0;
 let bgMode = 'light';
 let shadowEnabled = true;
@@ -1099,7 +1088,6 @@ function makeMaterial(role, colorIdx, matType) {
   if (matType === 'glass')  return makeGlassIllustMaterial(role, ci);
   if (matType === 'chrome') return makeBlenderPBRMaterial(role, ci);
   if (matType === 'spline') return makeTransmissionPlasticMaterial(ci);
-  if (matType === 'glossy') return makeGlossyPlasticMaterial(ci);
   if (matType === 'hdri') return makeHDRIMaterial(ci);
   // fallback
   const c = COLORS[ci];
@@ -1504,70 +1492,8 @@ function getSplineMatcapTexture() {
   return _splineMatcapTex;
 }
 
-// ── 매트 재질용 그라디언트맵 (조명 대비 완화 = 부드러운 계조) ──
-function makeMatteGradientMap(c) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512; canvas.height = 1;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createLinearGradient(0, 0, 512, 0);
-  // 어두운 쪽을 덜 어둡게 + 중간톤을 넓게 → 명암 경계가 완만해짐
-  const deep   = new THREE.Color(c.main).multiplyScalar(0.58);
-  const shadow = new THREE.Color(c.main).multiplyScalar(0.78);
-  const base   = new THREE.Color(c.main);
-  const light  = new THREE.Color(c.light);
-  const hi     = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.22);
-  grad.addColorStop(0.00, '#' + deep.getHexString());
-  grad.addColorStop(0.32, '#' + shadow.getHexString());
-  grad.addColorStop(0.60, '#' + base.getHexString());
-  grad.addColorStop(0.84, '#' + light.getHexString());
-  grad.addColorStop(1.00, '#' + hi.getHexString());
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, 512, 1);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = tex.magFilter = THREE.LinearFilter;
-  return tex;
-}
-
-// ── 매트 재질 (그레인 조절 가능) ──
-function makeTransmissionPlasticMaterial(colorIdx) {
-  const c = COLORS[colorIdx];
-
-  const gradMap = makeMatteGradientMap(c);
-  const mat = new THREE.MeshToonMaterial({
-    color: new THREE.Color(c.main),
-    gradientMap: gradMap,
-    side: THREE.FrontSide,
-  });
-
-  const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.5).convertSRGBToLinear();
-
-  mat.onBeforeCompile = function(shader) {
-    shader.uniforms.uRim   = { value: rimCol };
-    shader.uniforms.uGrain = { value: matteGrain };
-    mat.userData.shader = shader; // 그레인 실시간 조절용
-    shader.fragmentShader = shader.fragmentShader.replace(
-      'void main() {',
-      `uniform vec3 uRim;\nuniform float uGrain;\nvoid main() {`
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <output_fragment>',
-      `vec3 N  = normalize(vNormal);
-vec3 Vd = vec3(0.0, 0.0, 1.0);
-// 림라이트만: 얼룩 없이 외곽선만 밝게
-float rim = pow(1.0 - max(dot(N, Vd), 0.0), 4.0);
-outgoingLight += uRim * rim * 0.25;
-// 그레인(필름 노이즈): 매트 질감 표현
-float gn = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453);
-outgoingLight += (gn - 0.5) * uGrain;
-#include <output_fragment>`
-    );
-  };
-  mat.needsUpdate = true;
-  return mat;
-}
-
-// ── 플라스틱(광택) 재질용 그라디언트맵 (v2) ──
-function makeGlossyGradientMap(c) {
+// ── 플라스틱 재질용 그라디언트맵 (v2) ──
+function makePlasticGradientMap(c) {
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 1;
   const ctx = canvas.getContext('2d');
@@ -1587,11 +1513,11 @@ function makeGlossyGradientMap(c) {
   return tex;
 }
 
-// ── 플라스틱(광택) 재질 = v2 복원 (스페큘러 하이라이트) ──
-function makeGlossyPlasticMaterial(colorIdx) {
+// ── 플라스틱 재질 = v2 (스페큘러 하이라이트) ──
+function makeTransmissionPlasticMaterial(colorIdx) {
   const c = COLORS[colorIdx];
 
-  const gradMap = makeGlossyGradientMap(c);
+  const gradMap = makePlasticGradientMap(c);
   const mat = new THREE.MeshToonMaterial({
     color: new THREE.Color(c.main),
     gradientMap: gradMap,
@@ -2557,23 +2483,9 @@ function setMaterial(m) {
   scene.traverse(obj => { if (obj.material) obj.material.needsUpdate = true; });
   document.querySelectorAll('.mat-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('mat-' + m).classList.add('active');
-  // 그레인 UI는 매트 재질일 때만 표시
-  document.getElementById('grainPanel').style.display = (m === 'spline') ? '' : 'none';
   buildPartColorUI();
   updateBellMatPanel();
   buildAsset();
-}
-
-// 매트 재질 그레인 실시간 조절
-function setMatteGrain(v) {
-  matteGrain = parseFloat(v);
-  document.getElementById('grainVal').textContent = matteGrain.toFixed(2);
-  // 이미 생성된 매트 재질들의 uGrain uniform 즉시 갱신
-  scene.traverse(obj => {
-    if (obj.material && obj.material.userData && obj.material.userData.shader) {
-      obj.material.userData.shader.uniforms.uGrain.value = matteGrain;
-    }
-  });
 }
 
 function setColor(idx) {
@@ -2647,7 +2559,6 @@ function applyDotMaterial() {
     } else {
       if (currentMaterial === 'glass') node.material = makeGLBIllustMaterial(currentColor);
       else if (currentMaterial === 'spline') node.material = makeTransmissionPlasticMaterial(currentColor);
-      else if (currentMaterial === 'glossy') node.material = makeGlossyPlasticMaterial(currentColor);
       else if (currentMaterial === 'chrome') node.material = makePBRPlasticMaterial(currentColor);
       else if (currentMaterial === 'hdri') node.material = makeHDRIMaterial(currentColor);
     }
