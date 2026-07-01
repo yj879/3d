@@ -137,6 +137,7 @@
   .mat-dot.glass { background: linear-gradient(135deg, #d0eeff 20%, #2b74d4 80%); box-shadow: 0 0 0 1px rgba(100,180,255,0.3); }
   .mat-dot.chrome { background: linear-gradient(135deg, #eaf4ff 10%, #1045c8 60%, #060e30 100%); box-shadow: 0 0 0 1px rgba(60,120,255,0.25); }
   .mat-dot.spline { background: linear-gradient(135deg, #ffe0f0 10%, #ff6eb4 55%, #c0006a 100%); box-shadow: 0 0 0 1px rgba(255,100,180,0.35); }
+  .mat-dot.glossy { background: linear-gradient(135deg, #dfefff 8%, #5b8bff 52%, #1a3fb0 100%); box-shadow: 0 0 0 1px rgba(90,130,255,0.4); }
   .mat-dot.hdri { background: linear-gradient(135deg, #fff8e0 10%, #ffd54f 50%, #ff8f00 100%); box-shadow: 0 0 0 1px rgba(255,180,0,0.35); }
   #splineOverlay { display:none; position:absolute; inset:0; z-index:10; border-radius:inherit; overflow:hidden; }
   #splineOverlay iframe { width:100%; height:100%; border:none; }
@@ -183,6 +184,10 @@
     align-items: center;
     justify-content: center;
     position: relative;
+  }
+  .canvas-wrap.bg-checker {
+    background: repeating-conic-gradient(#3a3a44 0% 25%, #2a2a32 0% 50%) 0 0 / 22px 22px;
+    border-radius: 12px;
   }
   #glCanvas {
     display: block;
@@ -738,7 +743,7 @@
         <div class="bg-btns">
           <div class="bg-btn bg-light active" id="bgb-light" onclick="setBg('light')" title="밝 은  배 경 "></div>
           <div class="bg-btn bg-dark" id="bgb-dark" onclick="setBg('dark')" title="어 두 운  배 경 "></div>
-          <div class="bg-btn bg-transparent" id="bgb-trans" onclick="setBg('transparent')" title="투 명  배 경 "></div>
+          <div class="bg-btn bg-transparent" id="bgb-transparent" onclick="setBg('transparent')" title="투 명  배 경 "></div>
         </div>
         <div class="sep"></div>
         <div class="toggle-row">
@@ -1487,6 +1492,7 @@ function getSplineMatcapTexture() {
   return _splineMatcapTex;
 }
 
+// ── 플라스틱 재질용 그라디언트맵 (v2) ──
 function makePlasticGradientMap(c) {
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 1;
@@ -1507,20 +1513,24 @@ function makePlasticGradientMap(c) {
   return tex;
 }
 
+// ── 플라스틱 재질 = v2 (스페큘러 하이라이트) ──
 function makeTransmissionPlasticMaterial(colorIdx) {
   const c = COLORS[colorIdx];
+
   const gradMap = makePlasticGradientMap(c);
   const mat = new THREE.MeshToonMaterial({
     color: new THREE.Color(c.main),
     gradientMap: gradMap,
     side: THREE.FrontSide,
   });
+
   const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.65).convertSRGBToLinear();
+
   mat.onBeforeCompile = function(shader) {
     shader.uniforms.uRim = { value: rimCol };
     shader.fragmentShader = shader.fragmentShader.replace(
       'void main() {',
-      'uniform vec3 uRim;\nvoid main() {'
+      `uniform vec3 uRim;\nvoid main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
@@ -2564,9 +2574,10 @@ function setBg(mode) {
   bgMode = mode;
   document.querySelectorAll('.bg-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('bgb-' + mode).classList.add('active');
-  if (mode === 'light') { renderer.setClearColor(0xf2f4f8, 1); scene.background = new THREE.Color(0xf2f4f8); }
-  else if (mode === 'dark') { renderer.setClearColor(0x0a0a14, 1); scene.background = new THREE.Color(0x0a0a14); }
-  else { renderer.setClearColor(0x000000, 0); scene.background = null; }
+  const wrap = document.getElementById('canvasWrap');
+  if (mode === 'light') { renderer.setClearColor(0xf2f4f8, 1); scene.background = new THREE.Color(0xf2f4f8); wrap.classList.remove('bg-checker'); }
+  else if (mode === 'dark') { renderer.setClearColor(0x0a0a14, 1); scene.background = new THREE.Color(0x0a0a14); wrap.classList.remove('bg-checker'); }
+  else { renderer.setClearColor(0x000000, 0); scene.background = null; wrap.classList.add('bg-checker'); }
 }
 
 setBg('dark');
