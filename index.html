@@ -137,8 +137,9 @@
   .mat-dot.glass { background: linear-gradient(135deg, #d0eeff 20%, #2b74d4 80%); box-shadow: 0 0 0 1px rgba(100,180,255,0.3); }
   .mat-dot.chrome { background: linear-gradient(135deg, #eaf4ff 10%, #1045c8 60%, #060e30 100%); box-shadow: 0 0 0 1px rgba(60,120,255,0.25); }
   .mat-dot.spline { background: linear-gradient(135deg, #ffe0f0 10%, #ff6eb4 55%, #c0006a 100%); box-shadow: 0 0 0 1px rgba(255,100,180,0.35); }
+  .mat-dot.plastic2 { background: linear-gradient(135deg, #eaf3ff 8%, #7aa6ff 50%, #2450c0 100%); box-shadow: 0 0 0 1px rgba(120,160,255,0.4); }
+  .mat-dot.plastic3 { background: linear-gradient(135deg, #ffffff 5%, #9db8ff 45%, #3050d0 100%); box-shadow: 0 0 0 1px rgba(150,180,255,0.5); }
   .mat-dot.glossy { background: linear-gradient(135deg, #dfefff 8%, #5b8bff 52%, #1a3fb0 100%); box-shadow: 0 0 0 1px rgba(90,130,255,0.4); }
-  .mat-dot.plastic2 { background: linear-gradient(135deg, #fff4e0 8%, #ffb066 45%, #e8722a 78%, #a8420f 100%); box-shadow: 0 0 0 1px rgba(255,150,60,0.4); }
   .mat-dot.hdri { background: linear-gradient(135deg, #fff8e0 10%, #ffd54f 50%, #ff8f00 100%); box-shadow: 0 0 0 1px rgba(255,180,0,0.35); }
   #splineOverlay { display:none; position:absolute; inset:0; z-index:10; border-radius:inherit; overflow:hidden; }
   #splineOverlay iframe { width:100%; height:100%; border:none; }
@@ -575,6 +576,9 @@
       <button class="mat-btn" onclick="setMaterial('plastic2')" id="mat-plastic2">
         <span class="mat-dot plastic2"></span> 플 라 스 틱 2
       </button>
+      <button class="mat-btn" onclick="setMaterial('plastic3')" id="mat-plastic3">
+        <span class="mat-dot plastic3"></span> 플 라 스 틱 3
+      </button>
       <button class="mat-btn" onclick="setMaterial('hdri')" id="mat-hdri">
         <span class="mat-dot hdri"></span> HDRI 스 튜 디 오
       </button>
@@ -669,11 +673,6 @@
       <div class="panel-label">ZOOM</div>
       <input type="range" min="0.5" max="2.5" step="0.1" value="1.4" id="zoomSlider" style="width:100%;" oninput="setZoom(this.value)">
       <div class="zoom-label" id="zoomVal">1.4x</div>
-    </div>
-    <div class="panel-section">
-      <div class="panel-label">기 울 기  (TILT)</div>
-      <input type="range" min="-90" max="90" step="1" value="0" id="tiltSlider" style="width:100%;" oninput="setTilt(this.value)">
-      <div class="zoom-label" id="tiltVal">0\'b0</div>
     </div>
     <div class="divider"></div>
     <div class="panel-section">
@@ -1098,6 +1097,7 @@ function makeMaterial(role, colorIdx, matType) {
   if (matType === 'chrome') return makeBlenderPBRMaterial(role, ci);
   if (matType === 'spline') return makeTransmissionPlasticMaterial(ci);
   if (matType === 'plastic2') return makePlastic2Material(ci);
+  if (matType === 'plastic3') return makePlastic3Material(ci);
   if (matType === 'hdri') return makeHDRIMaterial(ci);
   // fallback
   const c = COLORS[ci];
@@ -1559,86 +1559,120 @@ outgoingLight += uRim * rim * 0.3;
   return mat;
 }
 
-// ── 색 명도/채도 조절 헬퍼 (lMul<1 진하게, >1 밝게 / sMul 채도) ──
-function deepenColor(hex, lMul, sMul) {
-  const col = new THREE.Color(hex);
-  const hsl = {};
-  col.getHSL(hsl);
-  col.setHSL(
-    hsl.h,
-    Math.min(1, hsl.s * sMul),
-    Math.min(0.97, Math.max(0, hsl.l * lMul))
-  );
-  return col;
+// ── 플라스틱2: Poliigon Clay Ceramic Glossy PBR 텍스처 기반 ──
+// 세라믹 광택 재질의 실측 PBR 맵(BaseColor/Roughness/Normal)을 사용.
+// normalMap의 미세 요철이 환경 반사를 잘게 흩뜨려 "선명한 창문 반사"를
+// 흐릿하게(모호하게) 만들고, envMapIntensity를 낮춰 환경 비침을 약하게 함.
+let _clayTex = null;
+function getClayTextures() {
+  if (_clayTex) return _clayTex;
+  const loader = new THREE.TextureLoader();
+  const base = loader.load('textures/clay/basecolor.jpg');
+  base.wrapS = base.wrapT = THREE.RepeatWrapping;
+  base.repeat.set(1, 1);
+  base.anisotropy = 4;
+  base.encoding = THREE.sRGBEncoding;
+  _clayTex = { base };
+  return _clayTex;
 }
 
-// ── 플라스틱 2: 통통한 3D 이모지 느낌 ──
-// MeshToonMaterial의 gradientMap은 빨강 채널만 흑백 램프로 쓰이므로,
-// 색 램프를 프래그먼트 셰이더에서 직접 계산해 outgoingLight를 덮어써서 완전 제어한다.
-//   · 내부(빛 안 받는 쪽)일수록 더 어둡고 진한 채도
-//   · 반사광 1: 선명한 글로시 스페큘러 하이라이트
-//   · 반사광 2: 아래쪽 바운스(반사) 라이트 (그림자 쪽만 따뜻하게)
 function makePlastic2Material(colorIdx) {
   const c = COLORS[colorIdx];
+  const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.6).convertSRGBToLinear();
+  const tex = getClayTextures();
 
-  const mat = new THREE.MeshToonMaterial({
+  // 세라믹 BaseColor(미묘한 색 얼룩)만 사용.
+  // normalMap/roughnessMap은 제외 — 둘 다 타일 광택 부분에서 조명을 선명히 반사해
+  // 사각 하이라이트 패치를 만들어 "선명한 환경 반사"를 오히려 강화하기 때문.
+  // roughness는 높게(0.6), envMapIntensity는 낮게(0.15) → 환경 비침을 모호하게.
+  const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(c.main),
-    side: THREE.DoubleSide,   // 종 내부(내벽)도 보이도록 뒷면 렌더
+    map: tex.base,
+    roughness: 0.6,
+    metalness: 0.0,
+    clearcoat: 0.0,
+    envMapIntensity: 0.15,
+    side: THREE.FrontSide,
   });
 
-  const toLin = (col) => col.clone().convertSRGBToLinear();
-  const uDeep   = toLin(deepenColor(c.main, 0.34, 1.6));   // 내부 최심부 (가장 진함)
-  const uShadow = toLin(deepenColor(c.main, 0.62, 1.45));  // 그림자
-  const uBase   = toLin(deepenColor(c.main, 1.0,  1.35));  // 기본
-  const uLit    = toLin(deepenColor(c.main, 1.35, 1.25));  // 밝은 본체 (채도 유지)
-  const uHi     = toLin(deepenColor(c.main, 1.7,  1.15));  // 최대 밝기 (창백해지지 않게)
-  const uRim    = toLin(new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.6));
-  const uBounce = toLin(new THREE.Color(c.light).lerp(new THREE.Color(c.main), 0.4));
-
   mat.onBeforeCompile = function(shader) {
-    shader.uniforms.uDeep   = { value: uDeep };
-    shader.uniforms.uShadow = { value: uShadow };
-    shader.uniforms.uBase   = { value: uBase };
-    shader.uniforms.uLit    = { value: uLit };
-    shader.uniforms.uHi     = { value: uHi };
-    shader.uniforms.uRim    = { value: uRim };
-    shader.uniforms.uBounce = { value: uBounce };
+    shader.uniforms.uRim = { value: rimCol };
     shader.fragmentShader = shader.fragmentShader.replace(
       'void main() {',
-      `uniform vec3 uDeep, uShadow, uBase, uLit, uHi, uRim, uBounce;\nvoid main() {`
+      `uniform vec3 uRim;\nvoid main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
-      `vec3 N    = normalize(vNormal);
-N *= gl_FrontFacing ? 1.0 : -1.0;                 // 뒷면(종 내벽)도 올바르게 셰이딩
-vec3 Vd   = vec3(0.0, 0.0, 1.0);
-vec3 Ldir = normalize(vec3(-0.35, 0.85, 0.55));   // 키 라이트 (좌상단, 뷰공간)
-float ndl = dot(N, Ldir);
-float shade = ndl * 0.5 + 0.5;                    // 0(내부) ~ 1(정면광)
+      `vec3 N2  = normalize(vNormal);
+vec3 Vd2 = vec3(0.0, 0.0, 1.0);
 
-// 색 램프: 넓게 겹치는 smoothstep으로 부드러운 연속 그라디언트 (가운데 갈라짐 방지)
-vec3 col = uDeep;
-col = mix(col, uShadow, smoothstep(0.05, 0.45, shade));
-col = mix(col, uBase,   smoothstep(0.25, 0.68, shade));
-col = mix(col, uLit,    smoothstep(0.50, 0.92, shade));
-col = mix(col, uHi,     smoothstep(0.80, 1.08, shade));
+// curvature 기반 fake AO: 노멀이 급격히 변하는 오목한 부분(주름)을 어둡게
+float curvature = length(fwidth(N2));
+float cavityAO = 1.0 - clamp(curvature * 2.2, 0.0, 1.0) * 0.45;
+outgoingLight *= cavityAO;
 
-// 반사광 2: 아래쪽 바운스(반사) 라이트 — 그림자 쪽만 따뜻하게 채움
-vec3 Lb = normalize(vec3(0.15, -0.8, 0.5));
-float bnc = max(dot(N, Lb), 0.0);
-float shadowMask = 1.0 - smoothstep(0.0, 0.5, ndl);
-col += uBounce * bnc * shadowMask * 0.4;
+// 얇은 림 라이트: 외곽선만 살짝 밝게
+float rim2 = pow(1.0 - max(dot(N2, Vd2), 0.0), 4.5);
+outgoingLight += uRim * rim2 * 0.16;
 
-// 반사광(광택): 좁고 선명한 글로시 핫스팟만 (넓은 밴드 제거 → 가운데 갈라짐 방지)
-vec3 H = normalize(Ldir + Vd);
-float sp = pow(max(dot(N, H), 0.0), 50.0);
-col += vec3(1.0) * sp * 1.0;
+#include <output_fragment>`
+    );
+  };
+  mat.needsUpdate = true;
+  return mat;
+}
 
-// 프레넬 글로시 엣지(광택감)
-float fres = pow(1.0 - max(dot(N, Vd), 0.0), 3.0);
-col += uRim * fres * 0.35;
+// ── 플라스틱3: 광택 세라믹 (Poliigon 풀 PBR 맵 + 선명한 환경 반사) ──
+// 플라스틱2 초기 버전의 룩. roughnessMap의 광택 얼룩이 환경 반사를
+// 사각 패치 형태로 선명하게 드러내는 것이 특징(도자기 유약 느낌).
+let _clayTex3 = null;
+function getClayTextures3() {
+  if (_clayTex3) return _clayTex3;
+  const loader = new THREE.TextureLoader();
+  const base  = loader.load('textures/clay/basecolor.jpg');
+  const rough = loader.load('textures/clay/roughness.jpg');
+  const norm  = loader.load('textures/clay/normal.jpg');
+  [base, rough, norm].forEach(t => {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(2.5, 2.5);
+    t.anisotropy = 4;
+  });
+  base.encoding = THREE.sRGBEncoding;
+  _clayTex3 = { base, rough, norm };
+  return _clayTex3;
+}
 
-outgoingLight = col;
+function makePlastic3Material(colorIdx) {
+  const c = COLORS[colorIdx];
+  const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.6).convertSRGBToLinear();
+  const tex = getClayTextures3();
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(c.main),
+    map: tex.base,
+    roughnessMap: tex.rough,
+    normalMap: tex.norm,
+    normalScale: new THREE.Vector2(0.35, 0.35),
+    roughness: 0.55,
+    metalness: 0.0,
+    clearcoat: 0.15,
+    clearcoatRoughness: 0.6,
+    envMapIntensity: 0.28,
+    side: THREE.FrontSide,
+  });
+
+  mat.onBeforeCompile = function(shader) {
+    shader.uniforms.uRim = { value: rimCol };
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      `uniform vec3 uRim;\nvoid main() {`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      `vec3 N3  = normalize(vNormal);
+vec3 Vd3 = vec3(0.0, 0.0, 1.0);
+float rim3 = pow(1.0 - max(dot(N3, Vd3), 0.0), 4.5);
+outgoingLight += uRim * rim3 * 0.16;
 #include <output_fragment>`
     );
   };
@@ -1829,6 +1863,13 @@ function applyMaterialToGLB(assetKey, obj, ci, mt) {
         return makePlastic2Material(meshCi);
       }
 
+      if (mt === 'plastic3') {
+        const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
+        if (userMatType === 'Holographic') return makePBRHolographicMaterial();
+        if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
+        return makePlastic3Material(meshCi);
+      }
+
       if (mt === 'hdri') {
         const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
         if (userMatType === 'Holographic') return makePBRHolographicMaterial();
@@ -1989,88 +2030,6 @@ function applyGLBMeshDefaults(name) {
   });
 }
 
-// ── 셸 메쉬에 실제 벽 두께 부여 (solidify) ──
-// 원본 셸(outer) + 노멀 방향 안쪽으로 offset한 내벽(inner) + 열린 입구를 잇는 rim 밴드
-function solidifyGeometry(src, t) {
-  if (!src.attributes.normal) src.computeVertexNormals();
-  const sp = src.attributes.position;
-  const sn = src.attributes.normal;
-  const index = src.index ? src.index.array : null;
-  const triCount = index ? (index.length / 3) : (sp.count / 3);
-  const gi = (f, c) => index ? index[f * 3 + c] : (f * 3 + c);
-  const V = (i) => [sp.getX(i), sp.getY(i), sp.getZ(i)];
-  const Nml = (i) => [sn.getX(i), sn.getY(i), sn.getZ(i)];
-
-  const pos = [], nor = [];
-  // OUTER: 바깥쪽으로 offset (두께를 밖으로 — 캐비티는 유지)
-  for (let f = 0; f < triCount; f++) {
-    for (let c = 0; c < 3; c++) {
-      const i = gi(f, c), p = V(i), nn = Nml(i);
-      pos.push(p[0] + nn[0] * t, p[1] + nn[1] * t, p[2] + nn[2] * t);
-      nor.push(nn[0], nn[1], nn[2]);
-    }
-  }
-  // INNER: 원본 위치 유지(캐비티 그대로), 노멀 반전, 감김 반전(0,2,1)
-  for (let f = 0; f < triCount; f++) {
-    for (const c of [0, 2, 1]) {
-      const i = gi(f, c), p = V(i), nn = Nml(i);
-      pos.push(p[0], p[1], p[2]);
-      nor.push(-nn[0], -nn[1], -nn[2]);
-    }
-  }
-  // 경계(열린 입구) 에지 검출 — 위치 기반 키로 시임 중복정점 병합
-  const q = 1e4;
-  const kkey = (i) => { const p = V(i); return Math.round(p[0]*q)+'_'+Math.round(p[1]*q)+'_'+Math.round(p[2]*q); };
-  const ecount = new Map(), erep = new Map();
-  for (let f = 0; f < triCount; f++) {
-    const vs = [gi(f,0), gi(f,1), gi(f,2)];
-    for (let e = 0; e < 3; e++) {
-      const a = vs[e], b = vs[(e+1)%3];
-      const ka = kkey(a), kb = kkey(b);
-      const id = ka < kb ? ka+'#'+kb : kb+'#'+ka;
-      ecount.set(id, (ecount.get(id)||0) + 1);
-      if (!erep.has(id)) erep.set(id, [a, b]);
-    }
-  }
-  // RIM: 경계 에지마다 outer↔inner 연결 밴드 (플랫 노멀)
-  const sub = (a,b) => [a[0]-b[0], a[1]-b[1], a[2]-b[2]];
-  const crs = (a,b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-  const nrm = (a) => { const l = Math.hypot(a[0],a[1],a[2])||1; return [a[0]/l, a[1]/l, a[2]/l]; };
-  const pushTri = (p1,p2,p3,fn) => {
-    pos.push(p1[0],p1[1],p1[2], p2[0],p2[1],p2[2], p3[0],p3[1],p3[2]);
-    nor.push(fn[0],fn[1],fn[2], fn[0],fn[1],fn[2], fn[0],fn[1],fn[2]);
-  };
-  for (const [id, c] of ecount) {
-    if (c !== 1) continue;
-    const [a, b] = erep.get(id);
-    const va = V(a), vb = V(b), na = Nml(a), nb = Nml(b);
-    const oa = [va[0]+na[0]*t, va[1]+na[1]*t, va[2]+na[2]*t];
-    const ob = [vb[0]+nb[0]*t, vb[1]+nb[1]*t, vb[2]+nb[2]*t];
-    const ia = va, ib = vb;
-    const fn1 = nrm(crs(sub(ob,oa), sub(ib,oa)));
-    pushTri(oa, ob, ib, fn1);
-    const fn2 = nrm(crs(sub(ib,oa), sub(ia,oa)));
-    pushTri(oa, ib, ia, fn2);
-  }
-
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-  return g;
-}
-
-// bell 셸(NurbsPath)에 벽 두께 적용 (모델당 1회, 캐시된 지오메트리 교체)
-const BELL_WALL_THICKNESS = 0.3;
-function solidifyBellModel(model) {
-  model.traverse(function(node) {
-    if (node.isMesh && node.name === 'NurbsPath' && !node.geometry.userData.solidified) {
-      const thick = solidifyGeometry(node.geometry, BELL_WALL_THICKNESS);
-      thick.userData.solidified = true;
-      node.geometry = thick;
-    }
-  });
-}
-
 function buildGLBAsset(name) {
   if (builtinGLBModels[name]) {
     discoverGLBMeshNames(name, builtinGLBModels[name]);
@@ -2093,7 +2052,6 @@ function buildGLBAsset(name) {
   const loader = new THREE.GLTFLoader();
   loader.load(GLB_URLS[name], function(gltf) {
     builtinGLBModels[name] = normalizeGLBModel(gltf.scene);
-    if (name === 'bell') solidifyBellModel(builtinGLBModels[name]);
     discoverGLBMeshNames(name, builtinGLBModels[name]);
     const clone = builtinGLBModels[name].clone(true);
     applyMaterialToGLB(name, clone, currentColor, currentMaterial);
@@ -2233,18 +2191,10 @@ function updateCamera() {
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
 // RENDER LOOP
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
-// 모델 기울기(roll, Z축) — 매 프레임 적용해 리빌드에도 유지
-let modelTilt = 0; // radians
-function setTilt(deg) {
-  modelTilt = parseFloat(deg) * Math.PI / 180;
-  document.getElementById('tiltVal').textContent = Math.round(deg) + '°';
-}
-
 let animId;
 function render() {
   animId = requestAnimationFrame(render);
   if (autoRotate) { rotY += 0.012; updateCamera(); }
-  if (assetGroup) assetGroup.rotation.z = modelTilt;
   renderer.render(scene, camera);
 }
 updateCamera();
@@ -2755,6 +2705,7 @@ function applyDotMaterial() {
       if (currentMaterial === 'glass') node.material = makeGLBIllustMaterial(currentColor);
       else if (currentMaterial === 'spline') node.material = makeTransmissionPlasticMaterial(currentColor);
       else if (currentMaterial === 'plastic2') node.material = makePlastic2Material(currentColor);
+      else if (currentMaterial === 'plastic3') node.material = makePlastic3Material(currentColor);
       else if (currentMaterial === 'chrome') node.material = makePBRPlasticMaterial(currentColor);
       else if (currentMaterial === 'hdri') node.material = makeHDRIMaterial(currentColor);
     }
