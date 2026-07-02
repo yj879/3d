@@ -139,6 +139,7 @@
   .mat-dot.spline { background: linear-gradient(135deg, #ffe0f0 10%, #ff6eb4 55%, #c0006a 100%); box-shadow: 0 0 0 1px rgba(255,100,180,0.35); }
   .mat-dot.plastic2 { background: linear-gradient(135deg, #eaf3ff 8%, #7aa6ff 50%, #2450c0 100%); box-shadow: 0 0 0 1px rgba(120,160,255,0.4); }
   .mat-dot.plastic3 { background: linear-gradient(135deg, #ffffff 5%, #9db8ff 45%, #3050d0 100%); box-shadow: 0 0 0 1px rgba(150,180,255,0.5); }
+  .mat-dot.plastic4 { background: linear-gradient(135deg, #ffffff 10%, #4a7dff 40%, #1a35c8 85%); box-shadow: 0 0 0 1px rgba(90,140,255,0.55); }
   .mat-dot.glossy { background: linear-gradient(135deg, #dfefff 8%, #5b8bff 52%, #1a3fb0 100%); box-shadow: 0 0 0 1px rgba(90,130,255,0.4); }
   .mat-dot.hdri { background: linear-gradient(135deg, #fff8e0 10%, #ffd54f 50%, #ff8f00 100%); box-shadow: 0 0 0 1px rgba(255,180,0,0.35); }
   #splineOverlay { display:none; position:absolute; inset:0; z-index:10; border-radius:inherit; overflow:hidden; }
@@ -579,6 +580,9 @@
       <button class="mat-btn" onclick="setMaterial('plastic3')" id="mat-plastic3">
         <span class="mat-dot plastic3"></span> 플 라 스 틱 3
       </button>
+      <button class="mat-btn" onclick="setMaterial('plastic4')" id="mat-plastic4">
+        <span class="mat-dot plastic4"></span> 플 라 스 틱 4
+      </button>
       <button class="mat-btn" onclick="setMaterial('hdri')" id="mat-hdri">
         <span class="mat-dot hdri"></span> HDRI 스 튜 디 오
       </button>
@@ -674,6 +678,12 @@
       <input type="range" min="0.5" max="2.5" step="0.1" value="1.4" id="zoomSlider" style="width:100%;" oninput="setZoom(this.value)">
       <div class="zoom-label" id="zoomVal">1.4x</div>
     </div>
+    <div class="panel-section">
+      <div class="panel-label">기울기 (TILT)</div>
+      <input type="range" min="-90" max="90" step="1" value="0" id="tiltSlider" style="width:100%;" oninput="setTilt(this.value)">
+      <div class="zoom-label" id="tiltVal">0°</div>
+      <div style="font-size:10px; color:var(--muted); margin-top:2px;">Shift+드래그로도 조절</div>
+    </div>
     <div class="divider"></div>
     <div class="panel-section">
       <div class="panel-label">SVG →  3D</div>
@@ -740,7 +750,7 @@
         <div id="lottieContainer" style="width:320px;height:320px;"></div>
         <div id="lottieLabel" style="font-size:11px;letter-spacing:0.12em;color:var(--muted);text-transform:uppercase;"></div>
       </div>
-      <div class="hint" id="hint">? ?  드 래 그 로  360\'b0 회 전 </div>
+      <div class="hint" id="hint">드래그로 360° 회전 · Shift+드래그로 기울기</div>
       <div class="canvas-controls">
         <button class="ctrl-btn active" id="btn-view1" onclick="setView(1)">Front</button>
         <button class="ctrl-btn" id="btn-view2" onclick="setView(2)">Side</button>
@@ -1098,6 +1108,7 @@ function makeMaterial(role, colorIdx, matType) {
   if (matType === 'spline') return makeTransmissionPlasticMaterial(ci);
   if (matType === 'plastic2') return makePlastic2Material(ci);
   if (matType === 'plastic3') return makePlastic3Material(ci);
+  if (matType === 'plastic4') return makePlastic4Material(ci);
   if (matType === 'hdri') return makeHDRIMaterial(ci);
   // fallback
   const c = COLORS[ci];
@@ -1680,6 +1691,54 @@ outgoingLight += uRim * rim3 * 0.16;
   return mat;
 }
 
+// ── 플라스틱 4: 토이 플라스틱 (glossy finish + vibrant solid color + high gloss highlights + slight transparency) ──
+// 레퍼런스: "Cute 3D icon, plastic material, glossy finish, smooth surface, vibrant solid colors,
+//            high gloss highlights, slight transparency, soft studio lighting"
+function makePlastic4Material(colorIdx) {
+  const c = COLORS[colorIdx];
+  // vibrant solid color: 채도 올린 선명한 고유색
+  const vivid = new THREE.Color(c.main);
+  const hsl = {};
+  vivid.getHSL(hsl);
+  vivid.setHSL(hsl.h, Math.min(1, hsl.s * 1.35), Math.min(0.5, Math.max(0.32, hsl.l)));
+
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: vivid,
+    roughness: 0.07,            // smooth surface
+    metalness: 0.0,
+    clearcoat: 1.0,             // glossy finish
+    clearcoatRoughness: 0.03,   // high gloss highlights
+    transmission: 0.07,         // slight transparency (색 씻김 방지 위해 약하게)
+    thickness: 0.5,
+    ior: 1.45,
+    transparent: true,
+    opacity: 1.0,
+    depthWrite: true,
+    side: THREE.DoubleSide,
+    envMapIntensity: 0.65,      // soft studio lighting 반사 (은은하게)
+  });
+
+  // 부드러운 스튜디오 림 (엣지 살짝 밝게)
+  const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.7).convertSRGBToLinear();
+  mat.onBeforeCompile = function(shader) {
+    shader.uniforms.uRim4 = { value: rimCol };
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      `uniform vec3 uRim4;\nvoid main() {`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      `vec3 N4  = normalize(vNormal);
+vec3 Vd4 = vec3(0.0, 0.0, 1.0);
+float rim4 = pow(1.0 - max(dot(N4, Vd4), 0.0), 3.5);
+outgoingLight += uRim4 * rim4 * 0.22;
+#include <output_fragment>`
+    );
+  };
+  mat.needsUpdate = true;
+  return mat;
+}
+
 function makePBRPlasticMaterial(colorIdx) {
   const c = COLORS[colorIdx];
   const baseColor = new THREE.Color(c.main).convertSRGBToLinear();
@@ -1868,6 +1927,13 @@ function applyMaterialToGLB(assetKey, obj, ci, mt) {
         if (userMatType === 'Holographic') return makePBRHolographicMaterial();
         if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
         return makePlastic3Material(meshCi);
+      }
+
+      if (mt === 'plastic4') {
+        const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
+        if (userMatType === 'Holographic') return makePBRHolographicMaterial();
+        if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
+        return makePlastic4Material(meshCi);
       }
 
       if (mt === 'hdri') {
@@ -2155,11 +2221,18 @@ window.addEventListener('mousemove', e => {
   if (!isDragging) return;
   const dx = e.clientX - prevMouse.x;
   const dy = e.clientY - prevMouse.y;
+  prevMouse = { x: e.clientX, y: e.clientY };
+  document.getElementById('hint').classList.add('hidden');
+  // Shift+드래그: 모델 기울기 (물체 중심 기준 roll)
+  if (e.shiftKey) {
+    modelTilt += dx * 0.008;
+    modelTilt = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, modelTilt));
+    syncTiltUI();
+    return;
+  }
   rotY += dx * 0.008;
   rotX += dy * 0.008;
   rotX = Math.max(-1.2, Math.min(1.2, rotX));
-  prevMouse = { x: e.clientX, y: e.clientY };
-  document.getElementById('hint').classList.add('hidden');
   updateCamera();
 });
 window.addEventListener('touchmove', e => {
@@ -2191,10 +2264,57 @@ function updateCamera() {
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
 // RENDER LOOP
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
+// ── 모델 기울기(TILT): 물체 정가운데(바운딩박스 중심)를 피벗으로 Z축 roll ──
+let modelTilt = 0; // radians
+let _tiltCenter = null, _tiltCenterKey = '';
+
+function setTilt(deg) {
+  modelTilt = parseFloat(deg) * Math.PI / 180;
+  document.getElementById('tiltVal').textContent = Math.round(deg) + '°';
+}
+function syncTiltUI() {
+  const deg = Math.round(modelTilt * 180 / Math.PI);
+  const s = document.getElementById('tiltSlider');
+  if (s) s.value = deg;
+  const v = document.getElementById('tiltVal');
+  if (v) v.textContent = deg + '°';
+}
+
+// 에셋의 (무회전 상태) 바운딩박스 중심 — 에셋/로드 상태가 바뀌면 재계산
+function getTiltCenter() {
+  const key = currentAsset + ':' + assetGroup.children.length;
+  if (_tiltCenter && _tiltCenterKey === key) return _tiltCenter;
+  const pr = assetGroup.rotation.z, px = assetGroup.position.x, py = assetGroup.position.y;
+  assetGroup.rotation.z = 0; assetGroup.position.x = 0; assetGroup.position.y = 0;
+  assetGroup.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(assetGroup);
+  _tiltCenter = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
+  _tiltCenterKey = key;
+  assetGroup.rotation.z = pr; assetGroup.position.x = px; assetGroup.position.y = py;
+  return _tiltCenter;
+}
+
+function applyTilt() {
+  if (!assetGroup) return;
+  if (modelTilt === 0) {
+    assetGroup.rotation.z = 0;
+    assetGroup.position.x = 0;
+    assetGroup.position.y = 0;
+    return;
+  }
+  const c = getTiltCenter();
+  const cos = Math.cos(modelTilt), sin = Math.sin(modelTilt);
+  assetGroup.rotation.z = modelTilt;
+  // 회전을 원점이 아닌 물체 중심(c) 기준으로: p = c - R·c
+  assetGroup.position.x = c.x - (cos * c.x - sin * c.y);
+  assetGroup.position.y = c.y - (sin * c.x + cos * c.y);
+}
+
 let animId;
 function render() {
   animId = requestAnimationFrame(render);
   if (autoRotate) { rotY += 0.012; updateCamera(); }
+  applyTilt();
   renderer.render(scene, camera);
 }
 updateCamera();
@@ -2616,6 +2736,14 @@ function setMaterial(m) {
     specPoint.intensity = 1.0;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
+  } else if (m === 'plastic4') {
+    // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지
+    if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
+    ambientLight.intensity = 0.28;
+    dirLight.intensity = 1.5;
+    specPoint.intensity = 0.8;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
   } else {
     // 다른 모드로 전환 시 HDRI 환경맵 제거
     if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
@@ -2706,6 +2834,7 @@ function applyDotMaterial() {
       else if (currentMaterial === 'spline') node.material = makeTransmissionPlasticMaterial(currentColor);
       else if (currentMaterial === 'plastic2') node.material = makePlastic2Material(currentColor);
       else if (currentMaterial === 'plastic3') node.material = makePlastic3Material(currentColor);
+      else if (currentMaterial === 'plastic4') node.material = makePlastic4Material(currentColor);
       else if (currentMaterial === 'chrome') node.material = makePBRPlasticMaterial(currentColor);
       else if (currentMaterial === 'hdri') node.material = makeHDRIMaterial(currentColor);
     }
