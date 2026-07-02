@@ -1303,56 +1303,106 @@ function roundBox(mesh, r) {
   mesh.scale.set(1,1,1);
 }
 
+// ── BELL: 두꺼운 벽 + 말린 립 + 뻥 뚫린 고리 손잡이 + 크림 추 (레퍼런스 기반) ──
+// 닫힌 프로파일(바깥면→립 롤→안쪽면)을 Lathe 회전 → 실제 벽 두께가 있는 솔리드
+function bellProfilePoints() {
+  const pts = [];
+  const P = (x, y) => pts.push(new THREE.Vector2(x, y));
+
+  // 1) 바깥 돔 → 스커트 (스플라인 샘플링)
+  const outer = new THREE.SplineCurve([
+    new THREE.Vector2(0.001, 1.04),
+    new THREE.Vector2(0.30, 1.00),
+    new THREE.Vector2(0.55, 0.86),
+    new THREE.Vector2(0.72, 0.62),
+    new THREE.Vector2(0.82, 0.30),
+    new THREE.Vector2(0.87, -0.05),
+    new THREE.Vector2(0.91, -0.38),
+  ]);
+  outer.getPoints(22).forEach(p => P(p.x, p.y));
+
+  // 2) 두꺼운 립: 바깥으로 말린 롤 (원호, 중심 C 반경 r)
+  const C = { x: 0.97, y: -0.55 }, r = 0.22;
+  for (let a = 92; a >= -178; a -= 12) {
+    const rad = a * Math.PI / 180;
+    P(C.x + r * Math.cos(rad), C.y + r * Math.sin(rad));
+  }
+
+  // 3) 안쪽 벽 → 내부 천장 (스플라인 샘플링)
+  const inner = new THREE.SplineCurve([
+    new THREE.Vector2(0.751, -0.563),
+    new THREE.Vector2(0.71, -0.30),
+    new THREE.Vector2(0.67, 0.05),
+    new THREE.Vector2(0.58, 0.40),
+    new THREE.Vector2(0.42, 0.66),
+    new THREE.Vector2(0.20, 0.82),
+    new THREE.Vector2(0.001, 0.88),
+  ]);
+  inner.getPoints(20).forEach(p => P(p.x, p.y));
+
+  return pts;
+}
+
 function buildBell(ci, mt) {
-  // SVG 패스에서 추출한 정확한 프로파일
-  const pts = [
-    new THREE.Vector2(0.000, +1.004),
-    new THREE.Vector2(0.479, +0.744),
-    new THREE.Vector2(0.486, +0.737),
-    new THREE.Vector2(0.665, +0.468),
-    new THREE.Vector2(0.727, +0.151),
-    new THREE.Vector2(0.727, -0.561),
-    new THREE.Vector2(0.762, -0.639),
-    new THREE.Vector2(0.966, -0.825),
-    new THREE.Vector2(0.993, -0.942),
-    new THREE.Vector2(0.889, -1.009),
-  ];
-  const bell = new THREE.Mesh(new THREE.LatheGeometry(pts, 64), makeMaterial('body', ci, mt));
+  // plastic4일 때 몸체엔 추(크림)의 색이 아래에서 비치는 바운스 반사 적용
+  const bodyMat = (mt === 'plastic4')
+    ? makePlastic4Material(ci, {
+        bounceColor: new THREE.Color(0xf2e4c8),
+        bounceDir: [0.15, -1.0, 0.35],
+        bounceStrength: 0.2,
+      })
+    : makeMaterial('body', ci, mt);
+
+  // 몸체 (벽 두께 포함 솔리드)
+  const bell = new THREE.Mesh(new THREE.LatheGeometry(bellProfilePoints(), 96), bodyMat);
+  bell.name = 'BellBody';
   bell.castShadow = true; bell.receiveShadow = true;
   assetGroup.add(bell);
 
-  // 바닥 막기 (내부 안 뚫리게)
-  const cap = new THREE.Mesh(new THREE.CircleGeometry(0.889, 64), makeMaterial('body', ci, mt));
-  cap.rotation.x = Math.PI / 2;
-  cap.position.y = -1.009;
-  assetGroup.add(cap);
+  // 손잡이: 뻥 뚫린 고리 (토러스, 구멍이 정면을 향함)
+  const handle = new THREE.Mesh(new THREE.TorusGeometry(0.20, 0.085, 22, 44), makeMaterial('body', ci, mt));
+  handle.name = 'BellHandle';
+  handle.position.y = 1.13;
+  handle.castShadow = true;
+  assetGroup.add(handle);
 
-  // 상단 꼭지
-  const knobCyl = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.13, 24), makeMaterial('body', ci, mt));
-  knobCyl.position.y = 1.06;
-  knobCyl.castShadow = true;
-  assetGroup.add(knobCyl);
-
-  const knobSphere = new THREE.Mesh(new THREE.SphereGeometry(0.09, 18, 18), makeMaterial('body', ci, mt));
-  knobSphere.position.y = 1.16;
-  assetGroup.add(knobSphere);
-
-  // 추 (이미지처럼 진한 색 구)
-  const clap = new THREE.Mesh(new THREE.SphereGeometry(0.14, 20, 20), makeMaterial('dark', ci, mt));
-  clap.position.y = -1.18;
+  // 추: 크림색 구 (레퍼런스 — 팔레트와 무관하게 항상 크림, 립 아래로 확실히 보이게)
+  const clap = new THREE.Mesh(new THREE.SphereGeometry(0.36, 40, 40), makeClapperMaterial(ci, mt));
+  clap.name = 'BellClapper';
+  clap.position.y = -0.74;
   clap.castShadow = true;
   assetGroup.add(clap);
 
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.20, 10), makeMaterial('dark', ci, mt));
-  rod.position.y = -1.08;
+  // 추 지지대 (내부, 살짝만 보임)
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.65, 12), makeClapperMaterial(ci, mt));
+  rod.name = 'BellRod';
+  rod.position.y = -0.30;
   assetGroup.add(rod);
+}
+
+// 추(clapper) 재질: 크림/아이보리 + 종 몸체색 바운스 반사
+function makeClapperMaterial(ci, mt) {
+  const cream = new THREE.Color(0xf2e9d8);
+  if (mt === 'plastic4') {
+    return makePlastic4Material(ci, {
+      baseColor: cream,
+      bounceColor: new THREE.Color(COLORS[ci].main),
+      bounceDir: [0.0, 1.0, 0.25],
+      bounceStrength: 0.4,
+    });
+  }
+  // 다른 재질 모드에서도 크림 글로시 유지 (레퍼런스 룩)
+  return new THREE.MeshPhysicalMaterial({
+    color: cream, roughness: 0.12, metalness: 0.0,
+    clearcoat: 1.0, clearcoatRoughness: 0.05, envMapIntensity: 0.6,
+  });
 }
 
 function buildAsset() {
   clearAsset();
   if (currentAsset === 'toast') buildToaster(currentColor, currentMaterial);
   else if (currentAsset === 'pot') buildPot(currentColor, currentMaterial);
-  else if (currentAsset === 'bell') buildGLBAsset('bell');
+  else if (currentAsset === 'bell') buildBell(currentColor, currentMaterial);
   else if (currentAsset === 'svg') buildSVG(currentColor, currentMaterial);
   else if (currentAsset === 'model') buildModel();
   else if (currentAsset === 'icon') buildGLBAsset('icon');
@@ -1694,13 +1744,22 @@ outgoingLight += uRim * rim3 * 0.16;
 // ── 플라스틱 4: 토이 플라스틱 (glossy finish + vibrant solid color + high gloss highlights + slight transparency) ──
 // 레퍼런스: "Cute 3D icon, plastic material, glossy finish, smooth surface, vibrant solid colors,
 //            high gloss highlights, slight transparency, soft studio lighting"
-function makePlastic4Material(colorIdx) {
+// opts: { baseColor, bounceColor, bounceDir:[x,y,z], bounceStrength }
+// bounce = 이웃 물체의 색이 반사광에 비치는 효과 (예: 종 몸체에 추의 크림색)
+function makePlastic4Material(colorIdx, opts) {
+  opts = opts || {};
   const c = COLORS[colorIdx];
   // vibrant solid color: 채도 올린 선명한 고유색
-  const vivid = new THREE.Color(c.main);
-  const hsl = {};
-  vivid.getHSL(hsl);
-  vivid.setHSL(hsl.h, Math.min(1, hsl.s * 1.35), Math.min(0.5, Math.max(0.32, hsl.l)));
+  let vivid;
+  if (opts.baseColor) {
+    vivid = opts.baseColor.clone ? opts.baseColor.clone() : new THREE.Color(opts.baseColor);
+  } else {
+    vivid = new THREE.Color(c.main);
+    const hsl = {};
+    vivid.getHSL(hsl);
+    // 레퍼런스 코발트 톤: 채도 높게, 명도는 진하게 클램프
+    vivid.setHSL(hsl.h, Math.min(1, hsl.s * 1.5), Math.min(0.36, Math.max(0.26, hsl.l * 0.85)));
+  }
 
   const mat = new THREE.MeshPhysicalMaterial({
     color: vivid,
@@ -1715,23 +1774,36 @@ function makePlastic4Material(colorIdx) {
     opacity: 1.0,
     depthWrite: true,
     side: THREE.DoubleSide,
-    envMapIntensity: 0.65,      // soft studio lighting 반사 (은은하게)
+    envMapIntensity: 0.5,       // soft studio lighting 반사 (은은하게)
   });
 
   // 부드러운 스튜디오 림 (엣지 살짝 밝게)
   const rimCol = new THREE.Color(c.light).lerp(new THREE.Color(0xffffff), 0.7).convertSRGBToLinear();
+  const bounceCol = (opts.bounceColor
+    ? (opts.bounceColor.clone ? opts.bounceColor.clone() : new THREE.Color(opts.bounceColor))
+    : new THREE.Color(0x000000)).convertSRGBToLinear();
+  const bd = opts.bounceDir || [0, -1, 0];
+  const bounceDir = new THREE.Vector3(bd[0], bd[1], bd[2]).normalize();
+  const bounceStr = opts.bounceStrength || 0.0;
+
   mat.onBeforeCompile = function(shader) {
     shader.uniforms.uRim4 = { value: rimCol };
+    shader.uniforms.uBounce4 = { value: bounceCol };
+    shader.uniforms.uBounceDir4 = { value: bounceDir };
+    shader.uniforms.uBounceStr4 = { value: bounceStr };
     shader.fragmentShader = shader.fragmentShader.replace(
       'void main() {',
-      `uniform vec3 uRim4;\nvoid main() {`
+      `uniform vec3 uRim4;\nuniform vec3 uBounce4;\nuniform vec3 uBounceDir4;\nuniform float uBounceStr4;\nvoid main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
       `vec3 N4  = normalize(vNormal);
 vec3 Vd4 = vec3(0.0, 0.0, 1.0);
 float rim4 = pow(1.0 - max(dot(N4, Vd4), 0.0), 3.5);
-outgoingLight += uRim4 * rim4 * 0.22;
+outgoingLight += uRim4 * rim4 * 0.15;
+// 이웃 물체색 바운스 반사 (질감 고도화)
+float bnc4 = pow(max(dot(N4, uBounceDir4), 0.0), 1.6);
+outgoingLight += uBounce4 * bnc4 * uBounceStr4;
 #include <output_fragment>`
     );
   };
@@ -2709,6 +2781,14 @@ function setAsset(name) {
   currentAsset = name;
   document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+  if (name === 'bell') {
+    // Bell 기본: 플라스틱4 + Blue → 바로 레퍼런스 룩
+    currentColor = 0;
+    document.querySelectorAll('.color-item').forEach((s, i) => s.classList.toggle('active', i === 0));
+    setZoom(0.8);
+    setMaterial('plastic4'); // buildAsset + 패널 갱신 포함
+    return;
+  }
   updateBellMatPanel(); updateDotMatPanel();
   buildAsset();
 }
@@ -2737,13 +2817,13 @@ function setMaterial(m) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
   } else if (m === 'plastic4') {
-    // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지
+    // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지 (레퍼런스 코발트 톤)
     if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
-    ambientLight.intensity = 0.28;
-    dirLight.intensity = 1.5;
+    ambientLight.intensity = 0.2;
+    dirLight.intensity = 1.45;
     specPoint.intensity = 0.8;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.95;
   } else {
     // 다른 모드로 전환 시 HDRI 환경맵 제거
     if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
@@ -2808,9 +2888,9 @@ function applyBellMat() {
   });
 }
 function updateBellMatPanel() {
-  const show = currentAsset === 'bell' && currentMaterial === 'chrome';
-  document.getElementById('bell-mat-panel').style.display = show ? '' : 'none';
-  document.getElementById('bell-mat-divider').style.display = show ? '' : 'none';
+  // 절차적 bell로 교체되며 GLB 전용 BELL 재질 패널은 사용 안 함
+  document.getElementById('bell-mat-panel').style.display = 'none';
+  document.getElementById('bell-mat-divider').style.display = 'none';
 }
 
 // ── DOT 재질 (Chat 점 전용) ──────────────────────────────────
