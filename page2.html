@@ -773,6 +773,7 @@
         <button class="ctrl-btn active" id="btn-view1" onclick="setView(1)">Front</button>
         <button class="ctrl-btn" id="btn-view2" onclick="setView(2)">Side</button>
         <button class="ctrl-btn" id="btn-view3" onclick="setView(3)">Top</button>
+        <button class="ctrl-btn" id="btn-hero" onclick="heroView()">기준뷰 ✦</button>
         <div class="sep"></div>
         <button class="ctrl-btn" id="btn-auto" onclick="toggleAuto()">Auto ▶ </button>
         <div class="sep"></div>
@@ -2554,12 +2555,27 @@ canvas.addEventListener('wheel', e => {
   updateCamera();
 });
 
+const camTarget = new THREE.Vector3(0, 0, 0);
 function updateCamera() {
   const r = 4.0 / cameraZoom;
-  camera.position.x = r * Math.sin(rotY) * Math.cos(rotX);
-  camera.position.y = r * Math.sin(rotX) + 0.5;
-  camera.position.z = r * Math.cos(rotY) * Math.cos(rotX);
-  camera.lookAt(0, 0, 0);
+  camera.position.x = camTarget.x + r * Math.sin(rotY) * Math.cos(rotX);
+  camera.position.y = camTarget.y + r * Math.sin(rotX) + 0.5;
+  camera.position.z = camTarget.z + r * Math.cos(rotY) * Math.cos(rotX);
+  camera.lookAt(camTarget);
+}
+
+// ── 기준뷰(Hero View): 프론트 기준 Z축 시계방향 45° 기울기 + 카메라 약간 위에서 내려다봄 ──
+// 어떤 에셋이든 물체 중심이 화면 중앙에 오도록 카메라 타겟을 에셋 중심으로 세팅
+function heroView() {
+  modelTilt = -45 * Math.PI / 180;   // 시계 방향 45° (물체 중심 피벗은 applyTilt가 처리)
+  syncTiltUI();
+  applyTilt();
+  rotY = 0;                          // 정면(Front)
+  rotX = 0.32;                       // 약간 위에서 내려다보는 각도
+  const c = getTiltCenter();
+  camTarget.set(c.x, c.y, c.z);
+  updateCamera();
+  document.getElementById('hint').classList.add('hidden');
 }
 
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
