@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/SVGLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/exporters/GLTFExporter.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/OBJLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/loaders/FBXLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/libs/fflate.min.js"></script>
@@ -140,6 +141,7 @@
   .mat-dot.plastic2 { background: linear-gradient(135deg, #eaf3ff 8%, #7aa6ff 50%, #2450c0 100%); box-shadow: 0 0 0 1px rgba(120,160,255,0.4); }
   .mat-dot.plastic3 { background: linear-gradient(135deg, #ffffff 5%, #9db8ff 45%, #3050d0 100%); box-shadow: 0 0 0 1px rgba(150,180,255,0.5); }
   .mat-dot.plastic4 { background: linear-gradient(135deg, #ffffff 10%, #4a7dff 40%, #1a35c8 85%); box-shadow: 0 0 0 1px rgba(90,140,255,0.55); }
+  .mat-dot.plastic5 { background: linear-gradient(135deg, #f0f0fa 10%, #b8b6e8 45%, #4a4fd8 90%); box-shadow: 0 0 0 1px rgba(160,160,230,0.5); }
   .mat-dot.glossy { background: linear-gradient(135deg, #dfefff 8%, #5b8bff 52%, #1a3fb0 100%); box-shadow: 0 0 0 1px rgba(90,130,255,0.4); }
   .mat-dot.hdri { background: linear-gradient(135deg, #fff8e0 10%, #ffd54f 50%, #ff8f00 100%); box-shadow: 0 0 0 1px rgba(255,180,0,0.35); }
   #splineOverlay { display:none; position:absolute; inset:0; z-index:10; border-radius:inherit; overflow:hidden; }
@@ -554,6 +556,7 @@
       <button class="asset-btn" onclick="setAsset('toast')" id="btn-toast">Toast</button>
       <button class="asset-btn" onclick="setAsset('pot')">Pot</button>
       <button class="asset-btn" onclick="setAsset('bell')">Bell</button>
+      <button class="asset-btn" onclick="setAsset('megaphone')">Megaphone</button>
     </div>
     <div class="divider"></div>
     <div class="panel-section">
@@ -582,6 +585,9 @@
       </button>
       <button class="mat-btn" onclick="setMaterial('plastic4')" id="mat-plastic4">
         <span class="mat-dot plastic4"></span> 플 라 스 틱 4
+      </button>
+      <button class="mat-btn" onclick="setMaterial('plastic5')" id="mat-plastic5">
+        <span class="mat-dot plastic5"></span> 플 라 스 틱 5
       </button>
       <button class="mat-btn" onclick="setMaterial('hdri')" id="mat-hdri">
         <span class="mat-dot hdri"></span> HDRI 스 튜 디 오
@@ -648,6 +654,18 @@
     </div>
     <div class="divider"></div>
     <!-- 파트별 색상 -->
+    <div class="panel-section" id="megPartSection" style="display:none;">
+      <div class="panel-label">확성기 파츠 컬러</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted);">나팔 <input type="color" value="#b9b7e6" oninput="setMegPartColor('horn', this.value)"></label>
+        <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted);">몸통 <input type="color" value="#3f44d6" oninput="setMegPartColor('body', this.value)"></label>
+        <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted);">손잡이 <input type="color" value="#e8eaf2" oninput="setMegPartColor('handle', this.value)"></label>
+        <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted);">태그 <input type="color" value="#3b4be0" oninput="setMegPartColor('tag', this.value)"></label>
+        <label style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--muted);">동전 <input type="color" value="#c9cdd6" oninput="setMegPartColor('coin', this.value)"></label>
+      </div>
+      <button class="asset-btn" id="btn-coinfall" style="margin-top:8px;" onclick="toggleCoinFall()">동전 낙하 ⏸</button>
+    </div>
+    <div class="divider" id="megPartDivider" style="display:none;"></div>
     <div class="panel-section" id="partColorSection">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div class="panel-label">PART COLORS</div>
@@ -805,6 +823,7 @@
     </div>
     <div class="panel-label">EXPORT</div>
     <button class="export-btn primary" onclick="exportPNG()">PNG 출 력 </button>
+    <button class="export-btn" onclick="exportGLB()">GLB 출력</button>
     <button class="export-btn" onclick="exportAPNG()">APNG 출 력 </button>
     <button class="export-btn" onclick="exportGIF()" id="gifBtn">GIF 출 력 </button>
     <div class="progress-bar" id="progressBar">
@@ -1109,6 +1128,7 @@ function makeMaterial(role, colorIdx, matType) {
   if (matType === 'plastic2') return makePlastic2Material(ci);
   if (matType === 'plastic3') return makePlastic3Material(ci);
   if (matType === 'plastic4') return makePlastic4Material(ci);
+  if (matType === 'plastic5') return makePlastic5Material(ci);
   if (matType === 'hdri') return makeHDRIMaterial(ci);
   // fallback
   const c = COLORS[ci];
@@ -1398,11 +1418,213 @@ function makeClapperMaterial(ci, mt) {
   });
 }
 
+// ── MEGAPHONE: 확성기 + 낙하 동전 + 비트코인 태그 (레퍼런스 기반) ──
+const megaphonePartColors = { horn: '#b9b7e6', body: '#3f44d6', handle: '#e8eaf2', tag: '#3b4be0', coin: '#c9cdd6' };
+let coinFall = true;
+let _megCoins = [];
+
+function setMegPartColor(part, val) {
+  megaphonePartColors[part] = val;
+  buildAsset();
+}
+function toggleCoinFall() {
+  coinFall = !coinFall;
+  const b = document.getElementById('btn-coinfall');
+  if (b) b.textContent = coinFall ? '동전 낙하 ⏸' : '동전 낙하 ▶';
+}
+function updateMegPanel() {
+  const show = currentAsset === 'megaphone';
+  const p = document.getElementById('megPartSection');
+  const d = document.getElementById('megPartDivider');
+  if (p) p.style.display = show ? '' : 'none';
+  if (d) d.style.display = show ? '' : 'none';
+}
+function updateCoinFall() {
+  if (currentAsset !== 'megaphone' || !coinFall) return;
+  _megCoins.forEach(function(c, i) {
+    c.position.y -= 0.014 + i * 0.005;
+    c.rotation.y += 0.02;
+    if (c.position.y < c.userData.baseY - 2.0) c.position.y = c.userData.baseY + 2.4;
+  });
+}
+
+// 파츠별 재질: plastic5면 파츠 컬러, 그 외엔 공용 재질
+function megMat(part, ci, mt) {
+  if (mt === 'plastic5') return makePlastic5Material(megaphonePartColors[part]);
+  return makeMaterial('body', ci, mt);
+}
+
+// ₿ 마크 텍스처 (글꼴 의존 없이 직접 드로잉)
+function makeBitcoinTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#d9e64a';
+  ctx.font = 'bold 92px Arial, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('B', 64, 70);
+  // 비트코인 세로 바 (위/아래)
+  ctx.fillRect(50, 6, 9, 18); ctx.fillRect(68, 6, 9, 18);
+  ctx.fillRect(50, 104, 9, 18); ctx.fillRect(68, 104, 9, 18);
+  return new THREE.CanvasTexture(cv);
+}
+
+function buildMegaphone(ci, mt) {
+  _megCoins = [];
+  const g = new THREE.Group();
+  g.name = 'Megaphone';
+
+  // 나팔 (horn) — 벌어진 콘 (DoubleSide로 안쪽도 보임)
+  const hornPts = new THREE.SplineCurve([
+    new THREE.Vector2(0.24, 0.30),
+    new THREE.Vector2(0.34, 0.54),
+    new THREE.Vector2(0.58, 0.80),
+    new THREE.Vector2(0.88, 1.04),
+    new THREE.Vector2(1.05, 1.16),
+  ]).getPoints(24);
+  const hornMat = megMat('horn', ci, mt);
+  hornMat.side = THREE.DoubleSide;
+  const horn = new THREE.Mesh(new THREE.LatheGeometry(hornPts, 64), hornMat);
+  horn.name = 'Horn';
+  horn.castShadow = true;
+  g.add(horn);
+
+  // 나팔 림 (입구 두께)
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.05, 16, 64), megMat('horn', ci, mt));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 1.16;
+  rim.name = 'HornRim';
+  g.add(rim);
+
+  // 마우스피스 (나팔 중앙 돌기)
+  const mp = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.4, 32), megMat('horn', ci, mt));
+  mp.position.y = 0.98;
+  mp.name = 'Mouthpiece';
+  g.add(mp);
+
+  // 몸통 (body) — 둥근 배럴
+  const bodyPts = new THREE.SplineCurve([
+    new THREE.Vector2(0.001, -0.72),
+    new THREE.Vector2(0.22, -0.68),
+    new THREE.Vector2(0.38, -0.50),
+    new THREE.Vector2(0.45, -0.22),
+    new THREE.Vector2(0.43, 0.06),
+    new THREE.Vector2(0.31, 0.27),
+    new THREE.Vector2(0.24, 0.31),
+  ]).getPoints(22);
+  const body = new THREE.Mesh(new THREE.LatheGeometry(bodyPts, 64), megMat('body', ci, mt));
+  body.name = 'Body';
+  body.castShadow = true;
+  g.add(body);
+
+  // 손잡이 (handle) — 비스듬한 납작 그립
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.10, 0.12, 0.75, 24), megMat('handle', ci, mt));
+  handle.scale.z = 0.6;
+  handle.position.set(-0.30, -0.88, 0);
+  handle.rotation.z = 0.55;
+  handle.name = 'Handle';
+  handle.castShadow = true;
+  g.add(handle);
+
+  // 태그 고리 (얇은 와이어)
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 12, 40), megMat('handle', ci, mt));
+  ring.position.set(-0.55, -1.12, 0);
+  ring.name = 'TagRing';
+  g.add(ring);
+
+  // 태그 — 라운드 사각 + 구멍 (Extrude)
+  const tagShape = new THREE.Shape();
+  const w = 0.44, h = 0.60, r = 0.10;
+  tagShape.moveTo(-w/2 + r, -h/2);
+  tagShape.lineTo(w/2 - r, -h/2);
+  tagShape.absarc(w/2 - r, -h/2 + r, r, -Math.PI/2, 0, false);
+  tagShape.lineTo(w/2, h/2 - r);
+  tagShape.absarc(w/2 - r, h/2 - r, r, 0, Math.PI/2, false);
+  tagShape.lineTo(-w/2 + r, h/2);
+  tagShape.absarc(-w/2 + r, h/2 - r, r, Math.PI/2, Math.PI, false);
+  tagShape.lineTo(-w/2, -h/2 + r);
+  tagShape.absarc(-w/2 + r, -h/2 + r, r, Math.PI, Math.PI * 1.5, false);
+  const holePath = new THREE.Path();
+  holePath.absarc(0, h/2 - 0.09, 0.045, 0, Math.PI * 2, true);
+  tagShape.holes.push(holePath);
+  const tagGeo = new THREE.ExtrudeGeometry(tagShape, {
+    depth: 0.05, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.012, bevelSegments: 2,
+  });
+  const tag = new THREE.Mesh(tagGeo, megMat('tag', ci, mt));
+  tag.position.set(-0.60, -1.52, -0.025);
+  tag.rotation.z = 0.35;
+  tag.name = 'Tag';
+  g.add(tag);
+
+  // ₿ 마크 (태그 자식으로 부착)
+  const bMark = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.3, 0.3),
+    new THREE.MeshBasicMaterial({ map: makeBitcoinTexture(), transparent: true })
+  );
+  bMark.position.set(0, -0.06, 0.075);
+  bMark.name = 'BitcoinMark';
+  tag.add(bMark);
+
+  // 기본 포즈: 레퍼런스처럼 비스듬
+  g.rotation.z = -0.55;
+  g.rotation.x = 0.12;
+  g.position.y = 0.05;
+  assetGroup.add(g);
+
+  // 동전 2개 (assetGroup 직속 → 월드 수직 낙하)
+  [[-1.25, -0.10, -0.35, 1.30, 0.30], [1.05, 0.55, -0.30, 1.45, -0.20]].forEach(function(p, i) {
+    const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.07, 48), megMat('coin', ci, mt));
+    coin.position.set(p[0], p[1], p[2]);
+    coin.rotation.set(p[3], 0, p[4]);
+    coin.name = 'Coin' + (i + 1);
+    coin.userData.baseY = p[1];
+    coin.castShadow = true;
+    assetGroup.add(coin);
+    _megCoins.push(coin);
+  });
+}
+
+// ── 플라스틱 5: 메탈릭 새틴 (레퍼런스 확성기 질감) ──
+function makePlastic5Material(color, opts) {
+  let col;
+  if (typeof color === 'number' && COLORS[color]) {
+    col = new THREE.Color(COLORS[color].main);
+    const hsl = {};
+    col.getHSL(hsl);
+    col.setHSL(hsl.h, Math.min(1, hsl.s * 1.1), Math.min(0.55, Math.max(0.35, hsl.l * 1.1)));
+  } else {
+    col = new THREE.Color(color);
+  }
+  return new THREE.MeshPhysicalMaterial({
+    color: col,
+    metalness: 0.72,
+    roughness: 0.32,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.25,
+    envMapIntensity: 0.9,
+    side: THREE.DoubleSide,
+  });
+}
+
+// ── GLB 내보내기 (현재 에셋 → .glb 다운로드) ──
+function exportGLB() {
+  const exporter = new THREE.GLTFExporter();
+  exporter.parse(assetGroup, function(result) {
+    const blob = new Blob([result], { type: 'model/gltf-binary' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = currentAsset + '.glb';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, { binary: true });
+}
+
 function buildAsset() {
   clearAsset();
   if (currentAsset === 'toast') buildToaster(currentColor, currentMaterial);
   else if (currentAsset === 'pot') buildPot(currentColor, currentMaterial);
   else if (currentAsset === 'bell') buildBell(currentColor, currentMaterial);
+  else if (currentAsset === 'megaphone') buildMegaphone(currentColor, currentMaterial);
   else if (currentAsset === 'svg') buildSVG(currentColor, currentMaterial);
   else if (currentAsset === 'model') buildModel();
   else if (currentAsset === 'icon') buildGLBAsset('icon');
@@ -2008,6 +2230,13 @@ function applyMaterialToGLB(assetKey, obj, ci, mt) {
         return makePlastic4Material(meshCi);
       }
 
+      if (mt === 'plastic5') {
+        const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
+        if (userMatType === 'Holographic') return makePBRHolographicMaterial();
+        if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
+        return makePlastic5Material(meshCi);
+      }
+
       if (mt === 'hdri') {
         const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
         if (userMatType === 'Holographic') return makePBRHolographicMaterial();
@@ -2387,6 +2616,7 @@ function render() {
   animId = requestAnimationFrame(render);
   if (autoRotate) { rotY += 0.012; updateCamera(); }
   applyTilt();
+  updateCoinFall();
   renderer.render(scene, camera);
 }
 updateCamera();
@@ -2781,6 +3011,12 @@ function setAsset(name) {
   currentAsset = name;
   document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+  if (name === 'megaphone') {
+    setZoom(0.9);
+    updateMegPanel();
+    setMaterial('plastic5'); // buildAsset 포함
+    return;
+  }
   if (name === 'bell') {
     // Bell 기본: 플라스틱4 + Blue → 바로 레퍼런스 룩
     currentColor = 0;
@@ -2789,7 +3025,7 @@ function setAsset(name) {
     setMaterial('plastic4'); // buildAsset + 패널 갱신 포함
     return;
   }
-  updateBellMatPanel(); updateDotMatPanel();
+  updateBellMatPanel(); updateDotMatPanel(); updateMegPanel();
   buildAsset();
 }
 
@@ -2816,7 +3052,7 @@ function setMaterial(m) {
     specPoint.intensity = 1.0;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
-  } else if (m === 'plastic4') {
+  } else if (m === 'plastic4' || m === 'plastic5') {
     // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지 (레퍼런스 코발트 톤)
     if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
     ambientLight.intensity = 0.2;
@@ -2915,6 +3151,7 @@ function applyDotMaterial() {
       else if (currentMaterial === 'plastic2') node.material = makePlastic2Material(currentColor);
       else if (currentMaterial === 'plastic3') node.material = makePlastic3Material(currentColor);
       else if (currentMaterial === 'plastic4') node.material = makePlastic4Material(currentColor);
+      else if (currentMaterial === 'plastic5') node.material = makePlastic5Material(currentColor);
       else if (currentMaterial === 'chrome') node.material = makePBRPlasticMaterial(currentColor);
       else if (currentMaterial === 'hdri') node.material = makeHDRIMaterial(currentColor);
     }
