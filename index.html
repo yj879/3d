@@ -142,6 +142,7 @@
   .mat-dot.plastic3 { background: linear-gradient(135deg, #ffffff 5%, #9db8ff 45%, #3050d0 100%); box-shadow: 0 0 0 1px rgba(150,180,255,0.5); }
   .mat-dot.plastic4 { background: linear-gradient(135deg, #ffffff 10%, #4a7dff 40%, #1a35c8 85%); box-shadow: 0 0 0 1px rgba(90,140,255,0.55); }
   .mat-dot.plastic5 { background: linear-gradient(135deg, #f0f0fa 10%, #b8b6e8 45%, #4a4fd8 90%); box-shadow: 0 0 0 1px rgba(160,160,230,0.5); }
+  .mat-dot.metal { background: linear-gradient(135deg, #ffffff 5%, #c9ccd4 45%, #70757f 100%); box-shadow: 0 0 0 1px rgba(200,205,215,0.5); }
   .mat-dot.glossy { background: linear-gradient(135deg, #dfefff 8%, #5b8bff 52%, #1a3fb0 100%); box-shadow: 0 0 0 1px rgba(90,130,255,0.4); }
   .mat-dot.hdri { background: linear-gradient(135deg, #fff8e0 10%, #ffd54f 50%, #ff8f00 100%); box-shadow: 0 0 0 1px rgba(255,180,0,0.35); }
   #splineOverlay { display:none; position:absolute; inset:0; z-index:10; border-radius:inherit; overflow:hidden; }
@@ -556,6 +557,7 @@
       <button class="asset-btn" onclick="setAsset('toast')" id="btn-toast">Toast</button>
       <button class="asset-btn" onclick="setAsset('pot')">Pot</button>
       <button class="asset-btn" onclick="setAsset('bell')">Bell</button>
+      <button class="asset-btn" onclick="setAsset('bell2')">Bell 2</button>
       <button class="asset-btn" onclick="setAsset('megaphone')">Megaphone</button>
     </div>
     <div class="divider"></div>
@@ -588,6 +590,9 @@
       </button>
       <button class="mat-btn" onclick="setMaterial('plastic5')" id="mat-plastic5">
         <span class="mat-dot plastic5"></span> 플 라 스 틱 5
+      </button>
+      <button class="mat-btn" onclick="setMaterial('metal')" id="mat-metal">
+        <span class="mat-dot metal"></span> 메 탈
       </button>
       <button class="mat-btn" onclick="setMaterial('hdri')" id="mat-hdri">
         <span class="mat-dot hdri"></span> HDRI 스 튜 디 오
@@ -654,6 +659,11 @@
     </div>
     <div class="divider"></div>
     <!-- 파트별 색상 -->
+    <div class="panel-section" id="bell2Section" style="display:none;">
+      <div class="panel-label">알림 배지</div>
+      <button class="asset-btn" id="btn-badge" onclick="toggleBadge()">배지 숨기기</button>
+    </div>
+    <div class="divider" id="bell2Divider" style="display:none;"></div>
     <div class="panel-section" id="megPartSection" style="display:none;">
       <div class="panel-label">확성기 파츠 컬러</div>
       <div style="display:flex; flex-direction:column; gap:6px;">
@@ -1130,6 +1140,7 @@ function makeMaterial(role, colorIdx, matType) {
   if (matType === 'plastic3') return makePlastic3Material(ci);
   if (matType === 'plastic4') return makePlastic4Material(ci);
   if (matType === 'plastic5') return makePlastic5Material(ci);
+  if (matType === 'metal') return makeMetalMaterial(ci);
   if (matType === 'hdri') return makeHDRIMaterial(ci);
   // fallback
   const c = COLORS[ci];
@@ -1439,6 +1450,11 @@ function updateMegPanel() {
   const d = document.getElementById('megPartDivider');
   if (p) p.style.display = show ? '' : 'none';
   if (d) d.style.display = show ? '' : 'none';
+  const show2 = currentAsset === 'bell2';
+  const p2 = document.getElementById('bell2Section');
+  const d2 = document.getElementById('bell2Divider');
+  if (p2) p2.style.display = show2 ? '' : 'none';
+  if (d2) d2.style.display = show2 ? '' : 'none';
 }
 function updateCoinFall() {
   if (currentAsset !== 'megaphone' || !coinFall) return;
@@ -1585,6 +1601,154 @@ function buildMegaphone(ci, mt) {
   });
 }
 
+
+// ── BELL 2: 크롬/실버 메탈 종 + 알림 배지(3) (레퍼런스 기반) ──
+let badgeVisible = true;
+function toggleBadge() {
+  badgeVisible = !badgeVisible;
+  const b = assetGroup.getObjectByName('Badge');
+  if (b) b.visible = badgeVisible;
+  const btn = document.getElementById('btn-badge');
+  if (btn) btn.textContent = badgeVisible ? '배지 숨기기' : '배지 표시';
+}
+
+// 얇고 날카롭게 안쪽으로 파고드는 립 프로파일 (뚱뚱한 튜브 림 대체)
+function bell2ProfilePoints() {
+  const pts = [];
+  const P = (x, y) => pts.push(new THREE.Vector2(x, y));
+  // 바깥 면: 돔 → 스커트 → 벌어진 립
+  new THREE.SplineCurve([
+    new THREE.Vector2(0.001, 1.08),
+    new THREE.Vector2(0.28, 1.03),
+    new THREE.Vector2(0.50, 0.88),
+    new THREE.Vector2(0.60, 0.62),
+    new THREE.Vector2(0.64, 0.35),
+    new THREE.Vector2(0.70, 0.05),
+    new THREE.Vector2(0.82, -0.25),
+    new THREE.Vector2(1.00, -0.50),
+  ]).getPoints(26).forEach(p => P(p.x, p.y));
+  // 립: 작은 반경으로 얇게 말림
+  const C = { x: 0.99, y: -0.60 }, r = 0.10;
+  for (let a = 80; a >= -180; a -= 15) {
+    const rad = a * Math.PI / 180;
+    P(C.x + r * Math.cos(rad), C.y + r * Math.sin(rad));
+  }
+  // 안쪽 벽: 위로 날카롭게 파고들어 깊은 내부 음영 생성
+  new THREE.SplineCurve([
+    new THREE.Vector2(0.885, -0.56),
+    new THREE.Vector2(0.80, -0.32),
+    new THREE.Vector2(0.72, -0.05),
+    new THREE.Vector2(0.62, 0.30),
+    new THREE.Vector2(0.44, 0.62),
+    new THREE.Vector2(0.20, 0.84),
+    new THREE.Vector2(0.001, 0.90),
+  ]).getPoints(24).forEach(p => P(p.x, p.y));
+  return pts;
+}
+
+// 숫자 3 텍스처
+function makeNumber3Texture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 96px Arial, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('3', 64, 70);
+  return new THREE.CanvasTexture(cv);
+}
+
+// Bell2 몸체용 메탈: 배지의 푸른빛이 표면에 비치는 inter-reflection 포함
+function makeBell2MetalMaterial(withBadgeBounce) {
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0xd9dbe0),
+    metalness: 1.0,
+    roughness: 0.16,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1.5,
+    side: THREE.DoubleSide,
+  });
+  if (withBadgeBounce) {
+    mat.onBeforeCompile = function(shader) {
+      shader.uniforms.uBadgeCol = { value: new THREE.Color(0x2e8fa8).convertSRGBToLinear() };
+      shader.uniforms.uBadgeDir = { value: new THREE.Vector3(0.6, 0.5, 0.45).normalize() };
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'void main() {',
+        'uniform vec3 uBadgeCol;\nuniform vec3 uBadgeDir;\nvoid main() {'
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <output_fragment>',
+        'vec3 Nb = normalize(vNormal);\nfloat bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\noutgoingLight += uBadgeCol * bb * 0.5;\n#include <output_fragment>'
+      );
+    };
+  }
+  return mat;
+}
+
+function buildBell2(ci, mt) {
+  const metal = (mt === 'metal');
+  const bodyMat = metal ? makeBell2MetalMaterial(true) : makeMaterial('body', ci, mt);
+  if (bodyMat.side !== undefined) bodyMat.side = THREE.DoubleSide;
+
+  const body = new THREE.Mesh(new THREE.LatheGeometry(bell2ProfilePoints(), 96), bodyMat);
+  body.name = 'Bell2Body';
+  body.castShadow = true;
+  assetGroup.add(body);
+
+  // 꼭지 (스템 + 구)
+  const stemMat = metal ? makeBell2MetalMaterial(false) : makeMaterial('body', ci, mt);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.16, 20), stemMat);
+  stem.position.y = 1.13; stem.name = 'TopStem';
+  assetGroup.add(stem);
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 24), stemMat);
+  knob.position.y = 1.26; knob.name = 'TopKnob';
+  assetGroup.add(knob);
+
+  // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
+  const clapMat = metal ? new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0xe2e4e8), metalness: 1.0, roughness: 0.10,
+    clearcoat: 0.5, clearcoatRoughness: 0.08, envMapIntensity: 1.8,
+  }) : makeClapperMaterial(ci, mt);
+  const clap = new THREE.Mesh(new THREE.SphereGeometry(0.30, 40, 40), clapMat);
+  clap.position.set(0, -0.52, 0.12);
+  clap.name = 'Clapper'; clap.castShadow = true;
+  assetGroup.add(clap);
+  const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 16), clapMat);
+  yoke.rotation.x = Math.PI / 2;
+  yoke.position.set(0, -0.42, -0.05);
+  yoke.name = 'ClapperYoke';
+  assetGroup.add(yoke);
+
+  // 알림 배지 '3' — 독립 파츠 (badgeVisible / toggleBadge()로 숨김 토글)
+  const badge = new THREE.Group();
+  badge.name = 'Badge';
+  const disc = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.10, 48), new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0x18606f), metalness: 0.2, roughness: 0.10,
+    clearcoat: 1.0, clearcoatRoughness: 0.05, envMapIntensity: 0.9,
+  }));
+  disc.rotation.x = Math.PI / 2;
+  disc.name = 'BadgeDisc';
+  badge.add(disc);
+  const num = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.46), new THREE.MeshBasicMaterial({ map: makeNumber3Texture(), transparent: true }));
+  num.position.z = 0.06;
+  num.name = 'BadgeNumber';
+  badge.add(num);
+  badge.position.set(0.92, 0.80, 0.40);
+  badge.visible = badgeVisible;
+  assetGroup.add(badge);
+}
+
+// ── 메탈 (공용): 크롬/실버, 팔레트색을 은색 쪽으로 강하게 희석 ──
+function makeMetalMaterial(colorIdx) {
+  const base = new THREE.Color(COLORS[colorIdx].main).lerp(new THREE.Color(0xd9dbe0), 0.75);
+  return new THREE.MeshPhysicalMaterial({
+    color: base, metalness: 1.0, roughness: 0.16,
+    clearcoat: 0.4, clearcoatRoughness: 0.12,
+    envMapIntensity: 1.5, side: THREE.DoubleSide,
+  });
+}
+
 // ── 플라스틱 5: 메탈릭 새틴 (레퍼런스 확성기 질감) ──
 function makePlastic5Material(color, opts) {
   let col;
@@ -1626,6 +1790,7 @@ function buildAsset() {
   else if (currentAsset === 'pot') buildPot(currentColor, currentMaterial);
   else if (currentAsset === 'bell') buildBell(currentColor, currentMaterial);
   else if (currentAsset === 'megaphone') buildMegaphone(currentColor, currentMaterial);
+  else if (currentAsset === 'bell2') buildBell2(currentColor, currentMaterial);
   else if (currentAsset === 'svg') buildSVG(currentColor, currentMaterial);
   else if (currentAsset === 'model') buildModel();
   else if (currentAsset === 'icon') buildGLBAsset('icon');
@@ -2236,6 +2401,13 @@ function applyMaterialToGLB(assetKey, obj, ci, mt) {
         if (userMatType === 'Holographic') return makePBRHolographicMaterial();
         if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
         return makePlastic5Material(meshCi);
+      }
+
+      if (mt === 'metal') {
+        const userMatType = glbPartMaterials[assetKey] && glbPartMaterials[assetKey][meshName];
+        if (userMatType === 'Holographic') return makePBRHolographicMaterial();
+        if (userMatType === 'Glass') return makePBRGlassMaterial(meshCi);
+        return makeMetalMaterial(meshCi);
       }
 
       if (mt === 'hdri') {
@@ -3032,6 +3204,12 @@ function setAsset(name) {
   currentAsset = name;
   document.querySelectorAll('.asset-btn').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
+  if (name === 'bell2') {
+    setZoom(0.8);
+    updateMegPanel();
+    setMaterial('metal'); // buildAsset 포함
+    return;
+  }
   if (name === 'megaphone') {
     setZoom(0.9);
     updateMegPanel();
@@ -3039,6 +3217,7 @@ function setAsset(name) {
     return;
   }
   if (name === 'bell') {
+    updateMegPanel();
     // Bell 기본: 플라스틱4 + Blue → 바로 레퍼런스 룩
     currentColor = 0;
     document.querySelectorAll('.color-item').forEach((s, i) => s.classList.toggle('active', i === 0));
@@ -3073,7 +3252,7 @@ function setMaterial(m) {
     specPoint.intensity = 1.0;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.0;
-  } else if (m === 'plastic4' || m === 'plastic5') {
+  } else if (m === 'plastic4' || m === 'plastic5' || m === 'metal') {
     // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지 (레퍼런스 코발트 톤)
     if (scene.environment === _hdriEnvMap && _roomEnvMap) scene.environment = _roomEnvMap;
     ambientLight.intensity = 0.2;
@@ -3173,6 +3352,7 @@ function applyDotMaterial() {
       else if (currentMaterial === 'plastic3') node.material = makePlastic3Material(currentColor);
       else if (currentMaterial === 'plastic4') node.material = makePlastic4Material(currentColor);
       else if (currentMaterial === 'plastic5') node.material = makePlastic5Material(currentColor);
+      else if (currentMaterial === 'metal') node.material = makeMetalMaterial(currentColor);
       else if (currentMaterial === 'chrome') node.material = makePBRPlasticMaterial(currentColor);
       else if (currentMaterial === 'hdri') node.material = makeHDRIMaterial(currentColor);
     }
