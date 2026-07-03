@@ -2567,11 +2567,12 @@ function updateCamera() {
 // ── 기준뷰(Hero View): 프론트 기준 Z축 시계방향 45° 기울기 + 카메라 약간 위에서 내려다봄 ──
 // 어떤 에셋이든 물체 중심이 화면 중앙에 오도록 카메라 타겟을 에셋 중심으로 세팅
 function heroView() {
-  modelTilt = 45 * Math.PI / 180;    // 레퍼런스 구도: 손잡이 좌상단, 입구 우하단 (물체 중심 피벗)
+  modelTilt = 45 * Math.PI / 180;    // 화면상 45° 기울기 (손잡이 좌상단, 입구 우하단)
+  heroPitch = -0.5;                  // 입구를 카메라 쪽으로 기울여 추/밑면이 보이게
   syncTiltUI();
   applyTilt();
-  rotY = 0;                          // 정면(Front)
-  rotX = 0.32;                       // 약간 위에서 내려다보는 각도
+  rotY = 0;                          // 정면(Front) — 고리가 정면을 향함
+  rotX = 0.14;                       // 살짝 위에서 내려다보는 각도
   const c = getTiltCenter();
   camTarget.set(c.x, c.y, c.z);
   updateCamera();
@@ -2582,7 +2583,8 @@ function heroView() {
 // RENDER LOOP
 // ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ 
 // ── 모델 기울기(TILT): 물체 정가운데(바운딩박스 중심)를 피벗으로 Z축 roll ──
-let modelTilt = 0; // radians
+let modelTilt = 0; // radians (Z축 roll)
+let heroPitch = 0; // radians (X축 pitch — 기준뷰에서 입구/밑면이 보이도록)
 let _tiltCenter = null, _tiltCenterKey = '';
 
 function setTilt(deg) {
@@ -2601,30 +2603,33 @@ function syncTiltUI() {
 function getTiltCenter() {
   const key = currentAsset + ':' + assetGroup.children.length;
   if (_tiltCenter && _tiltCenterKey === key) return _tiltCenter;
-  const pr = assetGroup.rotation.z, px = assetGroup.position.x, py = assetGroup.position.y;
-  assetGroup.rotation.z = 0; assetGroup.position.x = 0; assetGroup.position.y = 0;
+  const q0 = assetGroup.quaternion.clone(), p0 = assetGroup.position.clone();
+  assetGroup.quaternion.set(0, 0, 0, 1); assetGroup.position.set(0, 0, 0);
   assetGroup.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(assetGroup);
   _tiltCenter = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
   _tiltCenterKey = key;
-  assetGroup.rotation.z = pr; assetGroup.position.x = px; assetGroup.position.y = py;
+  assetGroup.quaternion.copy(q0); assetGroup.position.copy(p0);
   return _tiltCenter;
 }
 
 function applyTilt() {
   if (!assetGroup) return;
-  if (modelTilt === 0) {
-    assetGroup.rotation.z = 0;
-    assetGroup.position.x = 0;
-    assetGroup.position.y = 0;
+  if (modelTilt === 0 && heroPitch === 0) {
+    assetGroup.quaternion.set(0, 0, 0, 1);
+    assetGroup.position.set(0, 0, 0);
     return;
   }
   const c = getTiltCenter();
-  const cos = Math.cos(modelTilt), sin = Math.sin(modelTilt);
-  assetGroup.rotation.z = modelTilt;
+  // pitch(X) 먼저 → roll(Z): 입구가 카메라 쪽으로 기운 채 화면상 45° 기울기
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), modelTilt);
+  if (heroPitch !== 0) {
+    q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), heroPitch));
+  }
+  assetGroup.quaternion.copy(q);
   // 회전을 원점이 아닌 물체 중심(c) 기준으로: p = c - R·c
-  assetGroup.position.x = c.x - (cos * c.x - sin * c.y);
-  assetGroup.position.y = c.y - (sin * c.x + cos * c.y);
+  const rc = c.clone().applyQuaternion(q);
+  assetGroup.position.set(c.x - rc.x, c.y - rc.y, c.z - rc.z);
 }
 
 let animId;
