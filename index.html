@@ -2567,7 +2567,7 @@ function updateCamera() {
 // ── 기준뷰(Hero View): 프론트 기준 Z축 시계방향 45° 기울기 + 카메라 약간 위에서 내려다봄 ──
 // 어떤 에셋이든 물체 중심이 화면 중앙에 오도록 카메라 타겟을 에셋 중심으로 세팅
 function heroView() {
-  modelTilt = -45 * Math.PI / 180;   // 시계 방향 45° (물체 중심 피벗은 applyTilt가 처리)
+  modelTilt = 45 * Math.PI / 180;    // 레퍼런스 구도: 손잡이 좌상단, 입구 우하단 (물체 중심 피벗)
   syncTiltUI();
   applyTilt();
   rotY = 0;                          // 정면(Front)
