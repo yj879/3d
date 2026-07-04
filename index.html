@@ -1724,8 +1724,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   return mat;
 }
 
-// 작은 크롬 파츠(꼭지/추/막대): 아래쪽 어둡게 → 몸체와 같은 명암 대비
-function makeBell2SmallChrome() {
+// 작은 크롬 파츠 셰이더
+// darkMode=true (꼭지/막대): 대부분 어두운 면 + 상단 작은 하이라이트
+// darkMode=false (추): 화이트 반사광 ~5% + 절반가량 #777777 중간톤 + 하단 어두움
+function makeBell2SmallChrome(darkMode) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xd9dbe0),
     metalness: 1.0,
@@ -1734,10 +1736,17 @@ function makeBell2SmallChrome() {
     clearcoatRoughness: 0.12,
     envMapIntensity: 1.5,
   });
+  const lo  = darkMode ? '0.08' : '0.14';
+  const mid = darkMode ? '0.26' : '0.46';
   mat.onBeforeCompile = function(shader) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
-      'vec3 Ns = normalize(vNormal);\nfloat ggrad = clamp(Ns.y * 0.5 + 0.5, 0.0, 1.0);\noutgoingLight *= mix(0.16, 0.95, pow(ggrad, 1.5));\n#include <output_fragment>'
+      'vec3 Ns = normalize(vNormal);\n' +
+      'float gg = clamp(Ns.y * 0.5 + 0.5, 0.0, 1.0);\n' +
+      'float baseMul = mix(' + lo + ', ' + mid + ', smoothstep(0.25, 0.72, gg));\n' +
+      'float hot = pow(max(Ns.y, 0.0), 14.0);\n' +
+      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85;\n' +
+      '#include <output_fragment>'
     );
   };
   return mat;
@@ -1753,24 +1762,30 @@ function buildBell2(ci, mt) {
   body.castShadow = true;
   assetGroup.add(body);
 
-  // 꼭지 (스템 + 구)
-  const stemMat = metal ? makeBell2SmallChrome() : makeMaterial('body', ci, mt);
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.10, 0.28, 20), stemMat);
-  stem.position.y = 0.96; stem.name = 'TopStem';
-  assetGroup.add(stem);
-  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 24), stemMat);
-  knob.position.y = 1.12; knob.name = 'TopKnob';
+  // 꼭지: 둥근 머리 원통 (레퍼런스 아치 실루엣), 정중앙·돔에 파묻혀 연결
+  const knobMat = metal ? makeBell2SmallChrome(true) : makeMaterial('body', ci, mt);
+  const kr = 0.105, kh = 0.17;
+  const knobPts = [new THREE.Vector2(0.001, 0), new THREE.Vector2(kr, 0), new THREE.Vector2(kr, kh)];
+  for (let a = 10; a <= 90; a += 10) {
+    const rr = a * Math.PI / 180;
+    knobPts.push(new THREE.Vector2(kr * Math.cos(rr), kh + kr * Math.sin(rr)));
+  }
+  const knob = new THREE.Mesh(new THREE.LatheGeometry(knobPts, 32), knobMat);
+  knob.position.set(0, 0.86, 0);
+  knob.name = 'TopKnob';
+  knob.castShadow = true;
   assetGroup.add(knob);
 
   // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
-  const clapMat = metal ? makeBell2SmallChrome() : makeClapperMaterial(ci, mt);
+  const clapMat = metal ? makeBell2SmallChrome(false) : makeClapperMaterial(ci, mt);
   const clap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 40, 40), clapMat);
-  clap.position.set(0, -0.70, 0.14);
+  clap.position.set(0, -0.70, 0);
   clap.name = 'Clapper'; clap.castShadow = true;
   assetGroup.add(clap);
-  // 추를 내부 천장까지 잇는 세로 막대 (레퍼런스 연결 구조)
-  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.72, 16), clapMat);
-  rod.position.set(0, -0.36, 0.14);
+  // 추를 내부 천장까지 잇는 세로 막대 — 정중앙 축, 꼭지와 동일 축선상
+  const rodMat = metal ? makeBell2SmallChrome(true) : makeClapperMaterial(ci, mt);
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 1.5, 16), rodMat);
+  rod.position.set(0, 0.05, 0);
   rod.name = 'ClapperRod';
   assetGroup.add(rod);
 
