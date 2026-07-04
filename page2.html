@@ -1663,12 +1663,12 @@ function bell2ProfilePoints() {
     new THREE.Vector2(0.72, 0.35),
     new THREE.Vector2(0.76, 0.05),
     new THREE.Vector2(0.84, -0.22),
-    new THREE.Vector2(0.96, -0.40),
-    new THREE.Vector2(1.09, -0.52),
-    new THREE.Vector2(1.10, -0.63),
-    new THREE.Vector2(1.00, -0.72),
-    new THREE.Vector2(0.88, -0.69),
-    new THREE.Vector2(0.83, -0.60),
+    new THREE.Vector2(0.93, -0.40),
+    new THREE.Vector2(1.03, -0.52),
+    new THREE.Vector2(1.04, -0.63),
+    new THREE.Vector2(0.95, -0.72),
+    new THREE.Vector2(0.85, -0.68),
+    new THREE.Vector2(0.81, -0.60),
   ]).getPoints(48).forEach(p => P(p.x, p.y));
   // 안쪽 벽: 위로 날카롭게 파고들어 깊은 내부 음영 생성
   new THREE.SplineCurve([
@@ -1719,8 +1719,8 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.5;\n' +
-        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.8);\n' +
-        'outgoingLight += vec3(0.71, 0.71, 0.71) * frEdge * 1.05;\n' +
+        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
+        'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 1.2;\n' +
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
         'outgoingLight += vec3(1.0) * floorB * 0.22;\n' +
         'if (!gl_FrontFacing) outgoingLight *= 0.20;\n' +
@@ -1743,8 +1743,8 @@ function makeBell2SmallChrome(darkMode) {
     clearcoatRoughness: 0.12,
     envMapIntensity: 1.5,
   });
-  const lo  = darkMode ? '0.08' : '0.14';
-  const mid = darkMode ? '0.26' : '0.46';
+  const lo  = darkMode ? '0.14' : '0.30';
+  const mid = darkMode ? '0.32' : '0.55';
   mat.onBeforeCompile = function(shader) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
@@ -1752,7 +1752,8 @@ function makeBell2SmallChrome(darkMode) {
       'float gg = clamp(Ns.y * 0.5 + 0.5, 0.0, 1.0);\n' +
       'float baseMul = mix(' + lo + ', ' + mid + ', smoothstep(0.25, 0.72, gg));\n' +
       'float hot = pow(max(Ns.y, 0.0), 14.0);\n' +
-      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85;\n' +
+      'float frS = pow(1.0 - abs(dot(Ns, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
+      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85 + vec3(0.88) * frS * 0.9;\n' +
       '#include <output_fragment>'
     );
   };
@@ -1778,7 +1779,7 @@ function buildBell2(ci, mt) {
     knobPts.push(new THREE.Vector2(kr * Math.cos(rr), kh + kr * Math.sin(rr)));
   }
   const knob = new THREE.Mesh(new THREE.LatheGeometry(knobPts, 32), knobMat);
-  knob.position.set(0, 0.64, 0);
+  knob.position.set(0, 0.76, 0);
   knob.name = 'TopKnob';
   knob.castShadow = true;
   assetGroup.add(knob);
