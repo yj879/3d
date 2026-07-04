@@ -1620,15 +1620,21 @@ function getMetalEnv() {
   g.addColorStop(1.00, '#3a3e48');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
-  // 좌우 소프트 글로우 하이라이트 (딱딱한 사각 반사 방지)
-  [[100, 110, 55], [395, 105, 60]].forEach(function(w) {
-    const rg = ctx.createRadialGradient(w[0], w[1], 4, w[0], w[1], w[2]);
-    rg.addColorStop(0, 'rgba(255,255,255,0.9)');
-    rg.addColorStop(0.6, 'rgba(255,255,255,0.35)');
-    rg.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = rg;
-    ctx.fillRect(w[0]-w[2], w[1]-w[2], w[2]*2, w[2]*2);
-  });
+  // 좌우 대형 세로 소프트박스 (사각 화이트 반사, 가운데는 어두운 밴드 유지)
+  function softRect(x0, y0, w, h) {
+    const gx = ctx.createLinearGradient(x0, 0, x0 + w, 0);
+    gx.addColorStop(0, 'rgba(255,255,255,0)');
+    gx.addColorStop(0.22, 'rgba(255,255,255,0.96)');
+    gx.addColorStop(0.78, 'rgba(255,255,255,0.96)');
+    gx.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gx;
+    ctx.fillRect(x0, y0, w, h);
+  }
+  softRect(50, 30, 120, 180);
+  softRect(335, 26, 130, 190);
+  // 정면 반사용: 중앙(블랙 라인) 양옆 화이트 사각 — 사각형 가운데 블랙 패턴
+  softRect(186, 34, 58, 175);
+  softRect(270, 34, 58, 175);
   const tex = new THREE.CanvasTexture(cv);
   tex.mapping = THREE.EquirectangularReflectionMapping;
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -1719,8 +1725,8 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.5;\n' +
-        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
-        'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 1.2;\n' +
+        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 3.2);\n' +
+        'outgoingLight += vec3(1.0, 1.0, 1.0) * frEdge * 1.6;\n' +
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
         'outgoingLight += vec3(1.0) * floorB * 0.22;\n' +
         'if (!gl_FrontFacing) outgoingLight *= 0.20;\n' +
@@ -1743,8 +1749,8 @@ function makeBell2SmallChrome(darkMode) {
     clearcoatRoughness: 0.12,
     envMapIntensity: 1.5,
   });
-  const lo  = darkMode ? '0.14' : '0.30';
-  const mid = darkMode ? '0.32' : '0.55';
+  const lo  = darkMode ? '0.14' : '0.44';
+  const mid = darkMode ? '0.32' : '0.62';
   mat.onBeforeCompile = function(shader) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
@@ -1753,7 +1759,7 @@ function makeBell2SmallChrome(darkMode) {
       'float baseMul = mix(' + lo + ', ' + mid + ', smoothstep(0.25, 0.72, gg));\n' +
       'float hot = pow(max(Ns.y, 0.0), 14.0);\n' +
       'float frS = pow(1.0 - abs(dot(Ns, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
-      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85 + vec3(0.88) * frS * 0.9;\n' +
+      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85 + vec3(1.0) * frS * 1.15;\n' +
       '#include <output_fragment>'
     );
   };
@@ -1779,7 +1785,7 @@ function buildBell2(ci, mt) {
     knobPts.push(new THREE.Vector2(kr * Math.cos(rr), kh + kr * Math.sin(rr)));
   }
   const knob = new THREE.Mesh(new THREE.LatheGeometry(knobPts, 32), knobMat);
-  knob.position.set(0, 0.76, 0);
+  knob.position.set(0, 0.84, 0);
   knob.name = 'TopKnob';
   knob.castShadow = true;
   assetGroup.add(knob);
