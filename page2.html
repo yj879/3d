@@ -1657,12 +1657,12 @@ function bell2ProfilePoints() {
   // 바깥 면: 돔 → 스커트 → 벌어진 립
   new THREE.SplineCurve([
     new THREE.Vector2(0.001, 1.08),
-    new THREE.Vector2(0.28, 1.03),
-    new THREE.Vector2(0.50, 0.88),
-    new THREE.Vector2(0.60, 0.62),
-    new THREE.Vector2(0.64, 0.35),
-    new THREE.Vector2(0.70, 0.05),
-    new THREE.Vector2(0.82, -0.25),
+    new THREE.Vector2(0.34, 1.03),
+    new THREE.Vector2(0.58, 0.88),
+    new THREE.Vector2(0.68, 0.62),
+    new THREE.Vector2(0.72, 0.35),
+    new THREE.Vector2(0.76, 0.05),
+    new THREE.Vector2(0.85, -0.25),
     new THREE.Vector2(1.00, -0.50),
   ]).getPoints(26).forEach(p => P(p.x, p.y));
   // 립: 작은 반경으로 얇게 말림
@@ -1675,10 +1675,10 @@ function bell2ProfilePoints() {
   new THREE.SplineCurve([
     new THREE.Vector2(0.82, -0.54),
     new THREE.Vector2(0.80, -0.32),
-    new THREE.Vector2(0.72, -0.05),
-    new THREE.Vector2(0.62, 0.30),
-    new THREE.Vector2(0.44, 0.62),
-    new THREE.Vector2(0.20, 0.84),
+    new THREE.Vector2(0.78, -0.05),
+    new THREE.Vector2(0.68, 0.30),
+    new THREE.Vector2(0.52, 0.62),
+    new THREE.Vector2(0.26, 0.84),
     new THREE.Vector2(0.001, 0.90),
   ]).getPoints(24).forEach(p => P(p.x, p.y));
   return pts;
