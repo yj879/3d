@@ -1615,17 +1615,16 @@ function getMetalEnv() {
   g.addColorStop(0.30, '#15181f');  // 상단 짙은 블랙 밴드 (돔 위쪽 대비)
   g.addColorStop(0.42, '#dfe4ec');
   g.addColorStop(0.55, '#ffffff');  // 수평선 하이라이트
-  g.addColorStop(0.62, '#1a1e26');  // 하단 짙은 블랙 밴드
-  g.addColorStop(0.72, '#e8ecf2');  // 밝은 바닥 반사 시작 (립 아래 화이트)
-  g.addColorStop(0.88, '#f6f8fb');
-  g.addColorStop(1.00, '#c9ced8');
+  g.addColorStop(0.66, '#242832');  // 하단 어두운 밴드
+  g.addColorStop(0.85, '#7d838e');
+  g.addColorStop(1.00, '#3a3e48');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
   // 좌우 소프트 글로우 하이라이트 (딱딱한 사각 반사 방지)
-  [[100, 108, 75], [395, 102, 80]].forEach(function(w) {
-    const rg = ctx.createRadialGradient(w[0], w[1], 10, w[0], w[1], w[2]);
-    rg.addColorStop(0, 'rgba(255,255,255,1.0)');
-    rg.addColorStop(0.45, 'rgba(255,255,255,0.55)');
+  [[100, 110, 55], [395, 105, 60]].forEach(function(w) {
+    const rg = ctx.createRadialGradient(w[0], w[1], 4, w[0], w[1], w[2]);
+    rg.addColorStop(0, 'rgba(255,255,255,0.9)');
+    rg.addColorStop(0.6, 'rgba(255,255,255,0.35)');
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = rg;
     ctx.fillRect(w[0]-w[2], w[1]-w[2], w[2]*2, w[2]*2);
@@ -1702,10 +1701,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xd9dbe0),
     metalness: 1.0,
-    roughness: 0.12,
+    roughness: 0.16,
     clearcoat: 0.4,
-    clearcoatRoughness: 0.10,
-    envMapIntensity: 1.8,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1.5,
     side: THREE.DoubleSide,
   });
   if (withBadgeBounce) {
@@ -1725,6 +1724,25 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   return mat;
 }
 
+// 작은 크롬 파츠(꼭지/추/막대): 아래쪽 어둡게 → 몸체와 같은 명암 대비
+function makeBell2SmallChrome() {
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0xd9dbe0),
+    metalness: 1.0,
+    roughness: 0.16,
+    clearcoat: 0.4,
+    clearcoatRoughness: 0.12,
+    envMapIntensity: 1.5,
+  });
+  mat.onBeforeCompile = function(shader) {
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      'vec3 Ns = normalize(vNormal);\nfloat ggrad = clamp(Ns.y * 0.5 + 0.5, 0.0, 1.0);\noutgoingLight *= mix(0.16, 0.95, pow(ggrad, 1.5));\n#include <output_fragment>'
+    );
+  };
+  return mat;
+}
+
 function buildBell2(ci, mt) {
   const metal = (mt === 'metal');
   const bodyMat = metal ? makeBell2MetalMaterial(true) : makeMaterial('body', ci, mt);
@@ -1736,7 +1754,7 @@ function buildBell2(ci, mt) {
   assetGroup.add(body);
 
   // 꼭지 (스템 + 구)
-  const stemMat = metal ? makeBell2MetalMaterial(false) : makeMaterial('body', ci, mt);
+  const stemMat = metal ? makeBell2SmallChrome() : makeMaterial('body', ci, mt);
   const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.10, 0.28, 20), stemMat);
   stem.position.y = 0.96; stem.name = 'TopStem';
   assetGroup.add(stem);
@@ -1745,20 +1763,12 @@ function buildBell2(ci, mt) {
   assetGroup.add(knob);
 
   // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
-  let clapMat;
-  if (metal) {
-    clapMat = makeBell2MetalMaterial(false); // 몸체와 같은 크롬 (블랙/화이트 대비)
-    clapMat.roughness = 0.16;
-    clapMat.envMapIntensity = 1.7;
-    clapMat.color.set(0xcfd3da);
-  } else {
-    clapMat = makeClapperMaterial(ci, mt);
-  }
+  const clapMat = metal ? makeBell2SmallChrome() : makeClapperMaterial(ci, mt);
   const clap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 40, 40), clapMat);
   clap.position.set(0, -0.70, 0.14);
   clap.name = 'Clapper'; clap.castShadow = true;
   assetGroup.add(clap);
-  // 추를 내부 천장까지 잇는 세로 막대 (레퍼런스처럼 연결 구조가 보임)
+  // 추를 내부 천장까지 잇는 세로 막대 (레퍼런스 연결 구조)
   const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.72, 16), clapMat);
   rod.position.set(0, -0.36, 0.14);
   rod.name = 'ClapperRod';
@@ -3300,8 +3310,8 @@ function setMaterial(m) {
     // 크롬: 낮은 주변광 + 대비 강한 전용 환경맵
     scene.environment = getMetalEnv();
     ambientLight.intensity = 0.12;
-    dirLight.intensity = 1.15;
-    specPoint.intensity = 1.1;
+    dirLight.intensity = 0.9;
+    specPoint.intensity = 0.55;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.92;
   } else if (m === 'plastic4' || m === 'plastic5') {
