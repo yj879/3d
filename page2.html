@@ -1615,16 +1615,17 @@ function getMetalEnv() {
   g.addColorStop(0.30, '#15181f');  // 상단 짙은 블랙 밴드 (돔 위쪽 대비)
   g.addColorStop(0.42, '#dfe4ec');
   g.addColorStop(0.55, '#ffffff');  // 수평선 하이라이트
-  g.addColorStop(0.66, '#242832');  // 하단 어두운 밴드
-  g.addColorStop(0.85, '#7d838e');
-  g.addColorStop(1.00, '#3a3e48');
+  g.addColorStop(0.62, '#1a1e26');  // 하단 짙은 블랙 밴드
+  g.addColorStop(0.72, '#e8ecf2');  // 밝은 바닥 반사 시작 (립 아래 화이트)
+  g.addColorStop(0.88, '#f6f8fb');
+  g.addColorStop(1.00, '#c9ced8');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
   // 좌우 소프트 글로우 하이라이트 (딱딱한 사각 반사 방지)
-  [[100, 110, 55], [395, 105, 60]].forEach(function(w) {
-    const rg = ctx.createRadialGradient(w[0], w[1], 4, w[0], w[1], w[2]);
-    rg.addColorStop(0, 'rgba(255,255,255,0.9)');
-    rg.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+  [[100, 108, 75], [395, 102, 80]].forEach(function(w) {
+    const rg = ctx.createRadialGradient(w[0], w[1], 10, w[0], w[1], w[2]);
+    rg.addColorStop(0, 'rgba(255,255,255,1.0)');
+    rg.addColorStop(0.45, 'rgba(255,255,255,0.55)');
     rg.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = rg;
     ctx.fillRect(w[0]-w[2], w[1]-w[2], w[2]*2, w[2]*2);
@@ -1652,7 +1653,7 @@ function toggleBadge() {
 function bell2ProfilePoints() {
   const pts = [];
   // 레퍼런스 비율: 넓고 낮게 (x 확대, y 축소)
-  const SX = 1.05, SY = 0.88;
+  const SX = 0.95, SY = 0.88;
   const P = (x, y) => pts.push(new THREE.Vector2(x * SX, y * SY));
   // 바깥 면: 돔 → 스커트 → 벌어진 립
   new THREE.SplineCurve([
@@ -1701,10 +1702,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xd9dbe0),
     metalness: 1.0,
-    roughness: 0.16,
+    roughness: 0.12,
     clearcoat: 0.4,
-    clearcoatRoughness: 0.12,
-    envMapIntensity: 1.5,
+    clearcoatRoughness: 0.10,
+    envMapIntensity: 1.8,
     side: THREE.DoubleSide,
   });
   if (withBadgeBounce) {
@@ -1744,19 +1745,24 @@ function buildBell2(ci, mt) {
   assetGroup.add(knob);
 
   // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
-  const clapMat = metal ? new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(0xd4d7dd), metalness: 1.0, roughness: 0.22,
-    clearcoat: 0.4, clearcoatRoughness: 0.15, envMapIntensity: 1.4,
-  }) : makeClapperMaterial(ci, mt);
+  let clapMat;
+  if (metal) {
+    clapMat = makeBell2MetalMaterial(false); // 몸체와 같은 크롬 (블랙/화이트 대비)
+    clapMat.roughness = 0.16;
+    clapMat.envMapIntensity = 1.7;
+    clapMat.color.set(0xcfd3da);
+  } else {
+    clapMat = makeClapperMaterial(ci, mt);
+  }
   const clap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 40, 40), clapMat);
   clap.position.set(0, -0.70, 0.14);
   clap.name = 'Clapper'; clap.castShadow = true;
   assetGroup.add(clap);
-  const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 16), clapMat);
-  yoke.rotation.x = Math.PI / 2;
-  yoke.position.set(0, -0.55, -0.02);
-  yoke.name = 'ClapperYoke';
-  assetGroup.add(yoke);
+  // 추를 내부 천장까지 잇는 세로 막대 (레퍼런스처럼 연결 구조가 보임)
+  const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.72, 16), clapMat);
+  rod.position.set(0, -0.36, 0.14);
+  rod.name = 'ClapperRod';
+  assetGroup.add(rod);
 
   // 알림 배지 '3' — 독립 파츠 (badgeVisible / toggleBadge()로 숨김 토글)
   const badge = new THREE.Group();
@@ -3294,8 +3300,8 @@ function setMaterial(m) {
     // 크롬: 낮은 주변광 + 대비 강한 전용 환경맵
     scene.environment = getMetalEnv();
     ambientLight.intensity = 0.12;
-    dirLight.intensity = 0.9;
-    specPoint.intensity = 0.55;
+    dirLight.intensity = 1.15;
+    specPoint.intensity = 1.1;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.92;
   } else if (m === 'plastic4' || m === 'plastic5') {
