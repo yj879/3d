@@ -1620,10 +1620,15 @@ function getMetalEnv() {
   g.addColorStop(1.00, '#3a3e48');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
-  // 좌우 창문 하이라이트 (또렷한 스펙큘러 소스)
-  ctx.fillStyle = 'rgba(255,255,255,0.95)';
-  ctx.fillRect(70, 60, 60, 110);
-  ctx.fillRect(360, 55, 70, 120);
+  // 좌우 소프트 글로우 하이라이트 (딱딱한 사각 반사 방지)
+  [[100, 110, 55], [395, 105, 60]].forEach(function(w) {
+    const rg = ctx.createRadialGradient(w[0], w[1], 4, w[0], w[1], w[2]);
+    rg.addColorStop(0, 'rgba(255,255,255,0.9)');
+    rg.addColorStop(0.6, 'rgba(255,255,255,0.35)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(w[0]-w[2], w[1]-w[2], w[2]*2, w[2]*2);
+  });
   const tex = new THREE.CanvasTexture(cv);
   tex.mapping = THREE.EquirectangularReflectionMapping;
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -1647,7 +1652,7 @@ function toggleBadge() {
 function bell2ProfilePoints() {
   const pts = [];
   // 레퍼런스 비율: 넓고 낮게 (x 확대, y 축소)
-  const SX = 1.18, SY = 0.84;
+  const SX = 1.05, SY = 0.88;
   const P = (x, y) => pts.push(new THREE.Vector2(x * SX, y * SY));
   // 바깥 면: 돔 → 스커트 → 벌어진 립
   new THREE.SplineCurve([
@@ -1661,14 +1666,14 @@ function bell2ProfilePoints() {
     new THREE.Vector2(1.00, -0.50),
   ]).getPoints(26).forEach(p => P(p.x, p.y));
   // 립: 작은 반경으로 얇게 말림
-  const C = { x: 0.99, y: -0.60 }, r = 0.10;
+  const C = { x: 0.97, y: -0.58 }, r = 0.15;
   for (let a = 80; a >= -180; a -= 15) {
     const rad = a * Math.PI / 180;
     P(C.x + r * Math.cos(rad), C.y + r * Math.sin(rad));
   }
   // 안쪽 벽: 위로 날카롭게 파고들어 깊은 내부 음영 생성
   new THREE.SplineCurve([
-    new THREE.Vector2(0.885, -0.56),
+    new THREE.Vector2(0.82, -0.54),
     new THREE.Vector2(0.80, -0.32),
     new THREE.Vector2(0.72, -0.05),
     new THREE.Vector2(0.62, 0.30),
@@ -1712,7 +1717,7 @@ function makeBell2MetalMaterial(withBadgeBounce) {
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <output_fragment>',
-        'vec3 Nb = normalize(vNormal);\nfloat bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\noutgoingLight += uBadgeCol * bb * 0.5;\nif (!gl_FrontFacing) outgoingLight *= 0.30;\n#include <output_fragment>'
+        'vec3 Nb = normalize(vNormal);\nfloat bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\noutgoingLight += uBadgeCol * bb * 0.5;\nif (!gl_FrontFacing) outgoingLight *= 0.20;\n#include <output_fragment>'
       );
     };
   }
@@ -1731,20 +1736,20 @@ function buildBell2(ci, mt) {
 
   // 꼭지 (스템 + 구)
   const stemMat = metal ? makeBell2MetalMaterial(false) : makeMaterial('body', ci, mt);
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.16, 20), stemMat);
-  stem.position.y = 1.13; stem.name = 'TopStem';
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.10, 0.28, 20), stemMat);
+  stem.position.y = 0.96; stem.name = 'TopStem';
   assetGroup.add(stem);
   const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 24, 24), stemMat);
-  knob.position.y = 1.26; knob.name = 'TopKnob';
+  knob.position.y = 1.12; knob.name = 'TopKnob';
   assetGroup.add(knob);
 
   // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
   const clapMat = metal ? new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(0xdadde2), metalness: 1.0, roughness: 0.32,
-    clearcoat: 0.3, clearcoatRoughness: 0.25, envMapIntensity: 1.1,
+    color: new THREE.Color(0xd4d7dd), metalness: 1.0, roughness: 0.22,
+    clearcoat: 0.4, clearcoatRoughness: 0.15, envMapIntensity: 1.4,
   }) : makeClapperMaterial(ci, mt);
-  const clap = new THREE.Mesh(new THREE.SphereGeometry(0.34, 40, 40), clapMat);
-  clap.position.set(0, -0.72, 0.14);
+  const clap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 40, 40), clapMat);
+  clap.position.set(0, -0.70, 0.14);
   clap.name = 'Clapper'; clap.castShadow = true;
   assetGroup.add(clap);
   const yoke = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.55, 16), clapMat);
