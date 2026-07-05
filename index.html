@@ -1614,13 +1614,13 @@ function getMetalEnv() {
   // 넓은 밴드 + 또렷한 경계: PMREM 블러에도 화이트/블랙이 살아남게
   const g = ctx.createLinearGradient(0, 0, 0, 256);
   g.addColorStop(0.00, '#ffffff');
-  g.addColorStop(0.28, '#ffffff');  // 천장 순백 광폭
-  g.addColorStop(0.33, '#101318');
-  g.addColorStop(0.42, '#101318');  // 블랙 밴드 (넓게)
-  g.addColorStop(0.47, '#ffffff');
-  g.addColorStop(0.60, '#ffffff');  // 수평선 순백
-  g.addColorStop(0.66, '#2a2e38');
-  g.addColorStop(0.72, '#2a2e38');  // 하단 다크 밴드
+  g.addColorStop(0.18, '#ffffff');  // 천장 순백
+  g.addColorStop(0.23, '#23272f');
+  g.addColorStop(0.30, '#23272f');  // 상단 블랙 밴드 (돔 주 반사구간 위쪽)
+  g.addColorStop(0.36, '#ffffff');
+  g.addColorStop(0.58, '#ffffff');  // 수평선 순백 광폭 (돔이 이걸 반사)
+  g.addColorStop(0.65, '#565c68');
+  g.addColorStop(0.71, '#565c68');  // 하단 다크그레이 밴드
   g.addColorStop(0.78, '#f0f3f7');
   g.addColorStop(1.00, '#dfe3ea');
   ctx.fillStyle = g;
@@ -1725,10 +1725,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.5;\n' +
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 3.2);\n' +
-        'outgoingLight += vec3(1.0, 1.0, 1.0) * frEdge * 1.6;\n' +
+        'outgoingLight += vec3(1.0, 1.0, 1.0) * frEdge * 1.2;\n' +
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
-        'outgoingLight += vec3(1.0) * floorB * 0.22;\n' +
-        'if (!gl_FrontFacing) outgoingLight *= 0.20;\n' +
+        'outgoingLight += vec3(1.0) * floorB * 0.2;\n' +
+        'if (!gl_FrontFacing) outgoingLight *= 0.14;\n' +
         '#include <output_fragment>'
       );
     };
@@ -1790,7 +1790,32 @@ function buildBell2(ci, mt) {
   assetGroup.add(knob);
 
   // 추: 또렷한 하이라이트 (낮은 러프니스 + 강한 환경반사)
-  const clapMat = metal ? makeBell2SmallChrome(false) : makeClapperMaterial(ci, mt);
+  let clapMat;
+  if (metal) {
+    // 추: 레이어 램프 — 회색 ~50% / 블랙 ~10%(중하단 밴드) / 화이트 ~10%(상단 캡)
+    clapMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(0xd9dbe0), metalness: 1.0, roughness: 0.14,
+      clearcoat: 0.4, clearcoatRoughness: 0.12, envMapIntensity: 2.0,
+    });
+    clapMat.onBeforeCompile = function(shader) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <output_fragment>',
+        'vec3 Nc = normalize(vNormal);\n' +
+        'float gc = clamp(Nc.y * 0.5 + 0.5, 0.0, 1.0);\n' +
+        'float m = 0.36;\n' +
+        'float darkBandC = smoothstep(0.24, 0.31, gc) - smoothstep(0.40, 0.47, gc);\n' +
+        'm = mix(m, 0.13, darkBandC);\n' +
+        'm = mix(m, 0.48, smoothstep(0.46, 0.56, gc));\n' +
+        'm = mix(m, 0.60, smoothstep(0.64, 0.74, gc));\n' +
+        'm = mix(m, 1.00, smoothstep(0.84, 0.90, gc));\n' +
+        'float frC = pow(1.0 - abs(dot(Nc, vec3(0.0, 0.0, 1.0))), 3.0);\n' +
+        'outgoingLight = outgoingLight * m + vec3(1.0) * pow(max(Nc.y, 0.0), 16.0) * 0.6 + vec3(0.9) * frC * 0.25;\n' +
+        '#include <output_fragment>'
+      );
+    };
+  } else {
+    clapMat = makeClapperMaterial(ci, mt);
+  }
   const clap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 40, 40), clapMat);
   clap.position.set(0, -0.70, 0);
   clap.name = 'Clapper'; clap.castShadow = true;
