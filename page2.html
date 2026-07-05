@@ -1610,31 +1610,16 @@ function getMetalEnv() {
   cv.width = 512; cv.height = 256;
   const ctx = cv.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.00, '#a6acb6');
-  g.addColorStop(0.22, '#6f757f');  // 상부 베이스: 중간 회색 (창 프레임 대비)
-  g.addColorStop(0.42, '#454b55');
-  g.addColorStop(0.48, '#ffffff');
-  g.addColorStop(0.62, '#ffffff');  // 수평선 순백 광폭
-  g.addColorStop(0.68, '#3a3f49');  // 회색 시작
-  g.addColorStop(0.80, '#14171d');  // 회색→블랙 그라데이션
-  g.addColorStop(1.00, '#0b0d12');  // 바닥까지 블랙 (옆면 하단 블랙)
+  g.addColorStop(0.00, '#ffffff');  // 천장: 밝음
+  g.addColorStop(0.18, '#f2f4f8');
+  g.addColorStop(0.30, '#15181f');  // 상단 짙은 블랙 밴드 (돔 위쪽 대비)
+  g.addColorStop(0.42, '#dfe4ec');
+  g.addColorStop(0.55, '#ffffff');  // 수평선 하이라이트
+  g.addColorStop(0.66, '#242832');  // 하단 어두운 밴드
+  g.addColorStop(0.85, '#7d838e');
+  g.addColorStop(1.00, '#3a3e48');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
-  // 상부 '창' 반사: 화이트 사각 아웃라인 + 내부 회색→블랙 그라데이션 (세분화)
-  function windowRect(x0, y0, w, h) {
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(x0, y0, w, h);
-    const f = 22;
-    const ig = ctx.createLinearGradient(0, y0 + f, 0, y0 + h - f);
-    ig.addColorStop(0, '#7a808a');
-    ig.addColorStop(0.5, '#2e333d');
-    ig.addColorStop(1, '#08090d');
-    ctx.fillStyle = ig;
-    ctx.fillRect(x0 + f, y0 + f, w - 2 * f, h - 2 * f);
-  }
-  windowRect(52, 8, 140, 122);
-  windowRect(206, 6, 110, 126);
-  windowRect(320, 8, 140, 122);
   // 좌우 소프트 글로우 하이라이트 (딱딱한 사각 반사 방지)
   [[100, 110, 55], [395, 105, 60]].forEach(function(w) {
     const rg = ctx.createRadialGradient(w[0], w[1], 4, w[0], w[1], w[2]);
@@ -1715,10 +1700,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xd9dbe0),
     metalness: 1.0,
-    roughness: 0.06,
-    clearcoat: 0.1,
+    roughness: 0.16,
+    clearcoat: 0.4,
     clearcoatRoughness: 0.12,
-    envMapIntensity: 1.9,
+    envMapIntensity: 1.5,
     side: THREE.DoubleSide,
   });
   if (withBadgeBounce) {
@@ -1756,7 +1741,7 @@ function makeBell2SmallChrome(darkMode) {
     roughness: 0.16,
     clearcoat: 0.4,
     clearcoatRoughness: 0.12,
-    envMapIntensity: 1.9,
+    envMapIntensity: 1.5,
   });
   const lo  = darkMode ? '0.14' : '0.30';
   const mid = darkMode ? '0.32' : '0.55';
@@ -3351,7 +3336,7 @@ function setMaterial(m) {
     dirLight.intensity = 0.9;
     specPoint.intensity = 0.55;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 0.92;
   } else if (m === 'plastic4' || m === 'plastic5') {
     // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지 (레퍼런스 코발트 톤)
     if ((scene.environment === _hdriEnvMap || scene.environment === _metalEnvMap) && _roomEnvMap) scene.environment = _roomEnvMap;
