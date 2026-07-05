@@ -1609,42 +1609,31 @@ function getMetalEnv() {
   const cv = document.createElement('canvas');
   cv.width = 512; cv.height = 256;
   const ctx = cv.getContext('2d');
+  // 세로 그라데이션만 사용 → 방위각 끊김 없이 완전히 연속된 반사
+  // 순백 구간 ~35%: 천장 + 수평선 광폭 화이트 + 밝은 바닥
+  // 넓은 밴드 + 또렷한 경계: PMREM 블러에도 화이트/블랙이 살아남게
   const g = ctx.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0.00, '#ffffff');  // 천장: 밝음
-  g.addColorStop(0.18, '#f2f4f8');
-  g.addColorStop(0.30, '#15181f');  // 상단 짙은 블랙 밴드 (돔 위쪽 대비)
-  g.addColorStop(0.42, '#dfe4ec');
-  g.addColorStop(0.55, '#ffffff');  // 수평선 하이라이트
-  g.addColorStop(0.66, '#242832');  // 하단 어두운 밴드
-  g.addColorStop(0.85, '#7d838e');
-  g.addColorStop(1.00, '#3a3e48');
+  g.addColorStop(0.00, '#ffffff');
+  g.addColorStop(0.28, '#ffffff');  // 천장 순백 광폭
+  g.addColorStop(0.33, '#101318');
+  g.addColorStop(0.42, '#101318');  // 블랙 밴드 (넓게)
+  g.addColorStop(0.47, '#ffffff');
+  g.addColorStop(0.60, '#ffffff');  // 수평선 순백
+  g.addColorStop(0.66, '#2a2e38');
+  g.addColorStop(0.72, '#2a2e38');  // 하단 다크 밴드
+  g.addColorStop(0.78, '#f0f3f7');
+  g.addColorStop(1.00, '#dfe3ea');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 512, 256);
-  // 굵은 구성: 대형 화이트 소프트박스 2개 + 넓은 블랙 존 (끊김 없는 큰 면)
-  function softRect(x0, y0, w, h) {
-    const gx = ctx.createLinearGradient(x0, 0, x0 + w, 0);
-    gx.addColorStop(0, 'rgba(255,255,255,0)');
-    gx.addColorStop(0.25, 'rgba(255,255,255,0.97)');
-    gx.addColorStop(0.75, 'rgba(255,255,255,0.97)');
-    gx.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = gx;
-    ctx.fillRect(x0, y0, w, h);
-  }
-  softRect(60, 28, 146, 186);
-  softRect(306, 28, 146, 186);
-  // 넓은 다크 존: 중앙(정면 반사) + 양끝 — 옆면 ~40% 블랙, 부드러운 경계
-  function darkBand(x0, w) {
-    const gd = ctx.createLinearGradient(x0, 0, x0 + w, 0);
-    gd.addColorStop(0, 'rgba(14,17,24,0)');
-    gd.addColorStop(0.3, 'rgba(14,17,24,0.9)');
-    gd.addColorStop(0.7, 'rgba(14,17,24,0.9)');
-    gd.addColorStop(1, 'rgba(14,17,24,0)');
-    ctx.fillStyle = gd;
-    ctx.fillRect(x0, 18, w, 204);
-  }
-  darkBand(196, 120);
-  darkBand(-50, 112);
-  darkBand(450, 112);
+  // 좌우 소프트 글로우 (자연스러운 하이라이트 포인트, 경계 없음)
+  [[105, 100, 85], [400, 95, 90]].forEach(function(w) {
+    const rg = ctx.createRadialGradient(w[0], w[1], 8, w[0], w[1], w[2]);
+    rg.addColorStop(0, 'rgba(255,255,255,1.0)');
+    rg.addColorStop(0.55, 'rgba(255,255,255,0.5)');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(w[0]-w[2], w[1]-w[2], w[2]*2, w[2]*2);
+  });
   const tex = new THREE.CanvasTexture(cv);
   tex.mapping = THREE.EquirectangularReflectionMapping;
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -1716,10 +1705,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
   const mat = new THREE.MeshPhysicalMaterial({
     color: new THREE.Color(0xd9dbe0),
     metalness: 1.0,
-    roughness: 0.16,
+    roughness: 0.08,
     clearcoat: 0.4,
     clearcoatRoughness: 0.12,
-    envMapIntensity: 1.5,
+    envMapIntensity: 2.4,
     side: THREE.DoubleSide,
   });
   if (withBadgeBounce) {
@@ -1757,7 +1746,7 @@ function makeBell2SmallChrome(darkMode) {
     roughness: 0.16,
     clearcoat: 0.4,
     clearcoatRoughness: 0.12,
-    envMapIntensity: 1.5,
+    envMapIntensity: 2.4,
   });
   const lo  = darkMode ? '0.14' : '0.44';
   const mid = darkMode ? '0.32' : '0.62';
@@ -3352,7 +3341,7 @@ function setMaterial(m) {
     dirLight.intensity = 0.9;
     specPoint.intensity = 0.55;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.92;
+    renderer.toneMappingExposure = 1.0;
   } else if (m === 'plastic4' || m === 'plastic5') {
     // soft studio lighting: 낮은 주변광 + 키 라이트로 vibrant 색 유지 (레퍼런스 코발트 톤)
     if ((scene.environment === _hdriEnvMap || scene.environment === _metalEnvMap) && _roomEnvMap) scene.environment = _roomEnvMap;
