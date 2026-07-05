@@ -1719,6 +1719,15 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.5;\n' +
+        // 하이 콘트라스트 존: ndv(시선·노멀 내적) 구역 분할
+        'float nx = abs(Nb.x);\n' +
+        'float frontGate = smoothstep(0.0, 0.15, Nb.z);\n' +
+        // 양옆 쨍한 하이라이트 (#f5f5f5, ACES 보정 입력 2.6) — 칼 경계 세로 밴드
+        'float hiBand = smoothstep(0.34, 0.40, nx) * (1.0 - smoothstep(0.64, 0.70, nx)) * frontGate;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.2), hiBand);\n' +
+        // 정중앙 세로 다크 밴드 (#1a1a1a, ACES 보정 입력 0.0095) — 좁고 또렷
+        'float centerBand = (1.0 - smoothstep(0.26, 0.33, nx)) * frontGate;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(0.0095), centerBand);\n' +
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 1.2;\n' +
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
