@@ -1699,12 +1699,12 @@ function makeNumber3Texture() {
 // 하드 세로 밴드 제거 → 환경맵 반사가 부드럽게 흐르는 젖은 스테인리스 룩.
 function makeBell2MetalMaterial(withBadgeBounce) {
   const mat = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(0xdcdee3),
+    color: new THREE.Color(0xeceef2),
     metalness: 1.0,
-    roughness: 0.09,          // 더 젖은/매끈한 반사
-    clearcoat: 0.5,
-    clearcoatRoughness: 0.07,
-    envMapIntensity: 1.6,
+    roughness: 0.05,          // 날카로운 미러 반사
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.05,
+    envMapIntensity: 2.4,     // 밝고 강한 환경 반사
     side: THREE.DoubleSide,
   });
   if (withBadgeBounce) {
@@ -1721,12 +1721,15 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         // 배지의 푸른빛 inter-reflection (은은하게)
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
-        // 얇고 부드러운 프레넬 rim (폴리시드 크롬의 외곽 하이라이트)
-        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 3.5);\n' +
-        'outgoingLight += vec3(0.9) * frEdge * 0.55;\n' +
+        // 폴리시드 크롬 대비 부스트: 하이라이트↑ 다크↓ (밝고 쨍한 반사)
+        'outgoingLight = (outgoingLight - 0.30) * 1.5 + 0.36;\n' +
+        'outgoingLight = max(outgoingLight, vec3(0.0));\n' +
+        // 밝은 프레넬 rim (폴리시드 크롬 외곽 하이라이트)
+        'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 3.2);\n' +
+        'outgoingLight += vec3(1.0) * frEdge * 0.9;\n' +
         // 바닥 반사광 (하단부 은은한 밝기)
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
-        'outgoingLight += vec3(1.0) * floorB * 0.18;\n' +
+        'outgoingLight += vec3(1.0) * floorB * 0.22;\n' +
         'if (!gl_FrontFacing) outgoingLight *= 0.20;\n' +
         '#include <output_fragment>'
       );
