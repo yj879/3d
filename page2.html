@@ -1710,35 +1710,29 @@ function makeBell2MetalMaterial(withBadgeBounce) {
     mat.onBeforeCompile = function(shader) {
       shader.uniforms.uBadgeCol = { value: new THREE.Color(0x2e8fa8).convertSRGBToLinear() };
       shader.uniforms.uBadgeDir = { value: new THREE.Vector3(0.6, 0.5, 0.45).normalize() };
-      shader.vertexShader = shader.vertexShader
-        .replace('void main() {', 'varying float vObjY;\nvoid main() {')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjY = position.y;');
       shader.fragmentShader = shader.fragmentShader.replace(
         'void main() {',
-        'uniform vec3 uBadgeCol;\nuniform vec3 uBadgeDir;\nvarying float vObjY;\nvoid main() {'
+        'uniform vec3 uBadgeCol;\nuniform vec3 uBadgeDir;\nvoid main() {'
       );
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <output_fragment>',
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
-        'outgoingLight += uBadgeCol * bb * 0.5;\n' +
-        // 하이 콘트라스트 존: ndv(시선·노멀 내적) 구역 분할
-        // 카메라 향하도록 노멀 보정 (겉면 노멀 부호 이슈 → 밴드 미표시 버그 수정)
-        'vec3 Nf = Nb.z < 0.0 ? -Nb : Nb;\n' +
-        'float nx = abs(Nf.x);\n' +
-        'float frontGate = smoothstep(0.05, 0.25, Nf.z);\n' +
-        // 돔 구간 게이트: 오브젝트 y>0 (스커트/립/다른 파츠 제외 — 빨간 박스 존)
-        'float domeGate = smoothstep(-0.02, 0.12, vObjY) * frontGate;\n' +
-        // 양옆 쨍한 하이라이트 (#f5f5f5) — 칼 경계 세로 밴드
-        'float hiBand = smoothstep(0.30, 0.36, nx) * (1.0 - smoothstep(0.66, 0.72, nx)) * domeGate;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.2), hiBand);\n' +
-        // 정중앙 세로 다크 밴드 (#1a1a1a) — 좁고 또렷
-        'float centerBand = (1.0 - smoothstep(0.24, 0.31, nx)) * domeGate;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.0095), centerBand);\n' +
+        'outgoingLight += uBadgeCol * bb * 0.35;\n' +
+        'float nx = abs(Nb.x);\n' +
+        // 중앙 소프트 다크 그라데이션 — 시야 중앙 세로로 종 밑까지 흐름 (frontGate 없이 nx만)
+        'float centerDark = 1.0 - smoothstep(0.10, 0.40, nx);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(0.02), centerDark * 0.9);\n' +
+        // 다크 음영 안쪽 화이트 하이라이트 스트릭 (부드러운 세로 반사)
+        'float streak = smoothstep(0.10, 0.03, abs(nx - 0.13));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.8), streak * 0.9);\n' +
+        // 양옆 밝은 하이라이트 (어깨/사이드)
+        'float sideHi = smoothstep(0.42, 0.52, nx) * (1.0 - smoothstep(0.66, 0.74, nx));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.4), sideHi * 0.7);\n' +
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
-        'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 1.2;\n' +
+        'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
         'float floorB = pow(max(-Nb.y, 0.0), 2.0);\n' +
-        'outgoingLight += vec3(1.0) * floorB * 0.22;\n' +
+        'outgoingLight += vec3(1.0) * floorB * 0.15;\n' +
         'if (!gl_FrontFacing) outgoingLight *= 0.20;\n' +
         '#include <output_fragment>'
       );
