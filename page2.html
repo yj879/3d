@@ -1728,21 +1728,16 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
-        // ── 앞면 소프트박스(원형 사각형): #bbbbbb 외곽선 → 화이트 프레임(조명) → 내부 블랙 그라데이션 ──
-        'float frontFace = smoothstep(0.02, 0.28, vObjPos.z);\n' +          // 앞면만
-        'vec2 sp = vec2(vObjPos.x, vObjPos.y - 0.32);\n' +                  // 종 중앙(상부)
-        'vec2 hs = vec2(0.27, 0.44); float rad = 0.17;\n' +                 // 반크기·모서리반경 (아래 플레어 침범 안 함)
+        // ── 앞면 센터 다크 음영: 아웃라인/화이트 프레임 없음, 내부 그라데이션만 2배 확대 ──
+        'float frontFace = smoothstep(-0.05, 0.35, vObjPos.z);\n' +
+        'vec2 sp = vec2(vObjPos.x, vObjPos.y - 0.30);\n' +
+        'vec2 hs = vec2(0.52, 0.72); float rad = 0.28;\n' +                 // 기존 대비 ~2배, 옆면 채움
         'vec2 dd = abs(sp) - hs + rad;\n' +
         'float sdf = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0) - rad;\n' +
-        // 내부 블랙 그라데이션 (테두리→중앙으로 어두워짐)
-        'float inside = smoothstep(0.0, -0.24, sdf) * frontFace;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.012), inside * 0.93);\n' +
-        // 화이트 조명 프레임 (블랙을 감싸는 밝은 빛)
-        'float whiteFrame = (1.0 - smoothstep(0.0, 0.055, abs(sdf))) * frontFace;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.0), whiteFrame * 0.95);\n' +
-        // #bbbbbb 외곽 라인 (프레임 바깥 얇은 회색선)
-        'float grayLine = smoothstep(0.055, 0.07, sdf) * (1.0 - smoothstep(0.095, 0.11, sdf)) * frontFace;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.5), grayLine * 0.85);\n' +
+        // 경계 바깥부터 서서히 페이드 → 주변과 녹아듦 (스트록 없음)
+        'float inside = smoothstep(0.12, -0.5, sdf) * frontFace;\n' +
+        // 곱연산: 기존 크롬 반사 위에 음영 → 디테일 유지된 채 어두워짐
+        'outgoingLight *= mix(1.0, 0.18, inside);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
