@@ -1742,8 +1742,7 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         // 3) 화이트 4등분: 상하좌우 대각선 배치 (블랙 감싸는 4코너, 외곽 블러)
         'float archY = vObjPos.y - (-0.46 + 0.08 * ub * ub);\n' +
         'float dw1 = 1.0 - smoothstep(0.05, 0.70, length(vec2(ub / 0.38, archY / 0.10)));\n' +
-        'float archT = vObjPos.y - (0.98 - 0.16 * ub * ub);\n' +
-        'float dw2 = 1.0 - smoothstep(0.05, 1.0, length(vec2(ub / 0.45, archT / 0.10)));\n' +
+        'float dw2 = 0.0;\n' +
         'float xr3 = (ub + 0.60) / 0.15;\n' +
         'xr3 = mix(xr3, xr3 * 0.50, step(0.0, xr3));\n' +
         'float yr3 = vObjPos.y - 0.06;\n' +
