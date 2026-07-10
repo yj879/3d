@@ -1728,32 +1728,24 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
-        // ── 블랙 존을 감싸는 화이트 커브 + 내부 4방향 조명 (레퍼런스) ──
-        'float yGate = smoothstep(-0.36, -0.26, vObjPos.y);\n' +
-        'float rr = max(length(vObjPos.xz), 1e-4);\n' +
-        'float uu = clamp(vObjPos.x / rr, -1.0, 1.0);\n' +
-        'float zf = vObjPos.z / rr;\n' +
-        'float g = smoothstep(-0.1, 0.2, zf) * yGate;\n' +
-        // 타원 좌표: 아래로 갈수록 세로 반경 확장 → 대각선으로 흘러내려 립 바로 위까지
-        'float yr = 0.60 + 0.22 * smoothstep(0.40, -0.30, vObjPos.y);\n' +
-        'vec2 e = vec2((uu + 0.08) / 0.50, (vObjPos.y - 0.24) / yr);\n' +
-        'float ed = length(e);\n' +
-        // 안쪽 블랙 존
-        'float blackZone = (1.0 - smoothstep(0.55, 1.02, ed)) * g;\n' +
-        'outgoingLight *= mix(1.0, 0.10, blackZone);\n' +
-        // 블랙을 감싸는 부드러운 화이트 커브 밴드 (회색선 없음 — 블랙과 그라데이션으로 어우러짐)
-        'float wrapRing = smoothstep(0.88, 1.06, ed) * (1.0 - smoothstep(1.26, 1.5, ed)) * g;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.2), wrapRing);\n' +
-        // 내부: 링에 붙은 4개 직사각 반사 (곱형 소프트 마스크 — 중앙 세로줄 없음)
-        'float rm1 = (1.0 - smoothstep(0.42, 0.58, abs(e.x))) * (1.0 - smoothstep(0.20, 0.36, abs(e.y - 0.85)));\n' +
-        'float rm2 = (1.0 - smoothstep(0.42, 0.58, abs(e.x))) * (1.0 - smoothstep(0.20, 0.36, abs(e.y + 0.85)));\n' +
-        'float rm3 = (1.0 - smoothstep(0.20, 0.36, abs(e.x + 0.85))) * (1.0 - smoothstep(0.42, 0.58, abs(e.y)));\n' +
-        'float rm4 = (1.0 - smoothstep(0.20, 0.36, abs(e.x - 0.85))) * (1.0 - smoothstep(0.42, 0.58, abs(e.y)));\n' +
-        'float rSum = clamp(rm1 + rm2 + rm3 + rm4, 0.0, 1.0);\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.2), rSum * g);\n' +
-        // 하단 익스트루드(립) 위: 둥근 모델링 따라 타원 곡선 회색 라인
-        'float lipLine = smoothstep(-0.33, -0.29, vObjPos.y) * (1.0 - smoothstep(-0.27, -0.23, vObjPos.y)) * smoothstep(-0.2, 0.1, zf);\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.42), lipLine * 0.8);\n' +
+        // ── 곡률(노멀) 기반 셰이딩: 종의 형태를 따라 감기는 명암 (형태감 유지) ──
+        'vec3 Nf = Nb.z < 0.0 ? -Nb : Nb;\n' +
+        'float nx = abs(Nf.x);\n' +
+        'float zf = vObjPos.z / max(length(vObjPos.xz), 1e-4);\n' +
+        'float frontG = smoothstep(0.0, 0.35, Nf.z);\n' +
+        'float yGate = smoothstep(-0.34, -0.20, vObjPos.y);\n' +
+        // 위쪽 둥근 돔일수록 명암 강하게 (레퍼런스: 상부 원형 명도 구분 → 원근감)
+        'float domeW = 0.55 + 0.45 * smoothstep(-0.10, 0.55, vObjPos.y);\n' +
+        'float gN = frontG * yGate;\n' +
+        // 1) 다크 코어: 정면 좁은 각 — 곡면 따라 휘는 검은 밴드 (상부 진함)
+        'float darkCore = (1.0 - smoothstep(0.16, 0.30, nx)) * gN * domeW;\n' +
+        'outgoingLight *= mix(1.0, 0.12, darkCore);\n' +
+        // 2) 화이트 밴드: 다크 양옆, 곡면을 감아 도는 순백 반사
+        'float whiteBand = smoothstep(0.30, 0.40, nx) * (1.0 - smoothstep(0.56, 0.66, nx)) * gN * domeW;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.2), whiteBand);\n' +
+        // 3) 회색 라인: 화이트를 바깥에서 감싸는 톤 (실루엣 방향)
+        'float grayWrap = smoothstep(0.68, 0.78, nx) * (1.0 - smoothstep(0.88, 0.96, nx)) * gN * domeW;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(0.40), grayWrap * 0.85);\n' +
         // 하단 납작 타원 화이트 (립 윗면 앞쪽)
         'float lipY = smoothstep(-0.52, -0.42, vObjPos.y) * (1.0 - smoothstep(-0.34, -0.24, vObjPos.y));\n' +
         'outgoingLight = mix(outgoingLight, vec3(2.6), lipY * smoothstep(0.15, 0.55, zf) * 0.8);\n' +
