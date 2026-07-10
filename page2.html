@@ -1743,13 +1743,17 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float archY = vObjPos.y - (0.78 - 0.20 * ub * ub);\n' +
         'float dw1 = 1.0 - smoothstep(0.05, 1.20, length(vec2(ub / 0.55, archY / 0.15)));\n' +
         'float dw2 = 0.0;\n' +
-        'float dw3 = 1.0 - smoothstep(0.05, 1.10, length(vec2((ub + 0.60) / 0.10, (vObjPos.y - 0.20) / 0.21)));\n' +
-        'float dw4 = 1.0 - smoothstep(0.05, 1.10, length(vec2((ub - 0.60) / 0.10, (vObjPos.y - 0.20) / 0.21)));\n' +
+        'float xr3 = (ub + 0.60) / 0.15;\n' +
+        'float yr3 = vObjPos.y - 0.22;\n' +
+        'float dw3 = (1.0 - smoothstep(0.5, 1.1, abs(xr3))) * smoothstep(-0.36 + 0.10 * xr3 * xr3, -0.18 + 0.10 * xr3 * xr3, yr3) * (1.0 - smoothstep(0.28, 0.46, yr3));\n' +
+        'float xr4 = (ub - 0.60) / 0.15;\n' +
+        'float yr4 = vObjPos.y - 0.22;\n' +
+        'float dw4 = (1.0 - smoothstep(0.5, 1.1, abs(xr4))) * smoothstep(-0.36 + 0.10 * xr4 * xr4, -0.18 + 0.10 * xr4 * xr4, yr4) * (1.0 - smoothstep(0.28, 0.46, yr4));\n' +
         'float wAll = clamp(dw1 + dw2 + dw3 + dw4, 0.0, 1.0);\n' +
         // 원통 윤곽: 측면 노멀일수록 강해져 곡면을 감아 도는 하이라이트
         'vec3 NfH = Nb.z < 0.0 ? -Nb : Nb;\n' +
         'float cyl = 0.55 + 0.45 * smoothstep(0.25, 0.75, abs(NfH.x));\n' +
-        'outgoingLight = mix(outgoingLight, vec3(6.0), pow(wAll, 0.8) * cyl * gN);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(6.0), pow(wAll, 0.8) * cyl * gN * (1.0 - bz * 0.9));\n' +
         // 7) 스커트 존: 별도 다크 그라데이션 (돔과 분리)
         'float skirtG = smoothstep(-0.58, -0.46, vObjPos.y) * (1.0 - smoothstep(-0.32, -0.24, vObjPos.y)) * smoothstep(-0.05, 0.25, zf);\n' +
         'outgoingLight *= mix(1.0, mix(0.92, 0.28, gradLR), skirtG);\n' +
