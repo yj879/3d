@@ -1741,9 +1741,14 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'outgoingLight *= mix(1.0, 0.20, centerDark);\n' +
         // 종 옆면을 감싸는 두꺼운 세로 화이트 밴드 (거의 #ffffff, 좌우) — 중앙 블랙엔 반사 없음
         'float au = abs(u);\n' +
-        'float sideWrap = smoothstep(0.30, 0.44, au) * (1.0 - smoothstep(0.93, 1.0, au));\n' +
+        'float sideWrap = smoothstep(0.36, 0.50, au) * (1.0 - smoothstep(0.88, 0.98, au));\n' +
         'float sideGate = smoothstep(-0.04, 0.10, vObjPos.z) * yGate;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.0), sideWrap * sideGate * 0.92);\n' +
+        // 세로 3구간으로 끊어 군데군데 반사광 (사이 간격 = 은은한 크롬)
+        'float ySeg = smoothstep(0.55, 0.72, vObjPos.y)\n' +
+        '  + smoothstep(0.08, 0.24, vObjPos.y) * (1.0 - smoothstep(0.34, 0.48, vObjPos.y))\n' +
+        '  + smoothstep(-0.28, -0.14, vObjPos.y) * (1.0 - smoothstep(-0.04, 0.06, vObjPos.y));\n' +
+        'ySeg = clamp(ySeg, 0.0, 1.0);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.6), sideWrap * sideGate * ySeg * 0.78);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
