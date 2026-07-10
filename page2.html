@@ -1744,8 +1744,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float dR = smoothstep(0.76, 0.94, uu);\n' +
         'outgoingLight *= mix(1.0, 0.10, dC * g);\n' +
         'outgoingLight *= mix(1.0, 0.30, dR * g);\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.0), wL * g * 0.95);\n' +
-        'outgoingLight = mix(outgoingLight, vec3(2.8), wR * g * 0.85);\n' +
+        // 화이트를 상/하로도 분리 → 상하좌우 4섹션, 사이는 회색 크롬 질감(반사광 느낌)
+        'float seg = 1.0 - (smoothstep(0.24, 0.34, vObjPos.y) - smoothstep(0.46, 0.56, vObjPos.y));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.2), wL * seg * g);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.2), wR * seg * g * 0.95);\n' +
         // 하단 납작 타원 화이트 (립 윗면 앞쪽)
         'float lipY = smoothstep(-0.52, -0.42, vObjPos.y) * (1.0 - smoothstep(-0.34, -0.24, vObjPos.y));\n' +
         'outgoingLight = mix(outgoingLight, vec3(2.6), lipY * smoothstep(0.15, 0.55, zf) * 0.8);\n' +
