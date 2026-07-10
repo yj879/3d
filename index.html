@@ -1740,18 +1740,17 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float bz = 1.0 - smoothstep(0.30, 1.15, length(vec2(ub / 0.62, (vObjPos.y - 0.20) / 0.72)));\n' +
         'outgoingLight *= mix(1.0, 0.08, bz * gN);\n' +
         // 3) 화이트 4등분: 상하좌우 대각선 배치 (블랙 감싸는 4코너, 외곽 블러)
-        'float archY = vObjPos.y - (0.78 - 0.20 * ub * ub);\n' +
-        'float dw1 = 1.0 - smoothstep(0.05, 1.20, length(vec2(ub / 0.55, archY / 0.15)));\n' +
-        'float archY2 = vObjPos.y + 0.50 - 0.10 * ub * ub + 0.22 * ub;\n' +
-        'float dw2 = 1.0 - smoothstep(0.05, 0.85, length(vec2(ub / 0.32, archY2 / 0.10)));\n' +
+        'float archY = vObjPos.y - (-0.46 + 0.08 * ub * ub);\n' +
+        'float dw1 = 1.0 - smoothstep(0.05, 0.90, length(vec2(ub / 0.50, archY / 0.10)));\n' +
+        'float dw2 = 0.0;\n' +
         'float xr3 = (ub + 0.60) / 0.15;\n' +
         'xr3 = mix(xr3, xr3 * 0.50, step(0.0, xr3));\n' +
         'float yr3 = vObjPos.y - 0.06;\n' +
-        'float dw3 = (1.0 - smoothstep(0.6, 1.05, abs(xr3))) * smoothstep(-0.30 + 0.14 * xr3 * xr3, -0.24 + 0.14 * xr3 * xr3, yr3) * (1.0 - smoothstep(0.28, 0.46, yr3));\n' +
+        'float dw3 = (1.0 - smoothstep(0.6, 1.05, abs(xr3))) * smoothstep(-0.32 + 0.14 * xr3 * xr3, -0.18 + 0.14 * xr3 * xr3, yr3) * (1.0 - smoothstep(0.22 - 0.10 * xr3 * xr3, 0.50 - 0.10 * xr3 * xr3, yr3));\n' +
         'float xr4 = (ub - 0.60) / 0.15;\n' +
         'xr4 = mix(xr4, xr4 * 0.50, step(xr4, 0.0));\n' +
         'float yr4 = vObjPos.y - 0.06;\n' +
-        'float dw4 = (1.0 - smoothstep(0.6, 1.05, abs(xr4))) * smoothstep(-0.30 + 0.14 * xr4 * xr4, -0.24 + 0.14 * xr4 * xr4, yr4) * (1.0 - smoothstep(0.28, 0.46, yr4));\n' +
+        'float dw4 = (1.0 - smoothstep(0.6, 1.05, abs(xr4))) * smoothstep(-0.32 + 0.14 * xr4 * xr4, -0.18 + 0.14 * xr4 * xr4, yr4) * (1.0 - smoothstep(0.22 - 0.10 * xr4 * xr4, 0.50 - 0.10 * xr4 * xr4, yr4));\n' +
         'float wAll = clamp(dw1 + dw2 + dw3 + dw4, 0.0, 1.0);\n' +
         // 원통 윤곽: 측면 노멀일수록 강해져 곡면을 감아 도는 하이라이트
         'vec3 NfH = Nb.z < 0.0 ? -Nb : Nb;\n' +
