@@ -1732,31 +1732,30 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         // 안→밖: 중앙 블랙 그라데이션 → #fafafa 반사광(네 방면 감쌈) → 넓은 블랙 아웃라인 → #bbbbbb 외곽선
         'float yGate = smoothstep(-0.34, -0.26, vObjPos.y);\n' +            // 아래 extrude(플레어) 침범 방지
         'float frontFace = smoothstep(0.02, 0.28, vObjPos.z) * yGate;\n' +  // 앞면만
-        'vec2 sp = vec2(vObjPos.x, vObjPos.y - 0.32);\n' +                  // 종 중앙(상부)
-        'vec2 hs = vec2(0.27, 0.44); float rad = 0.17;\n' +                 // 반크기·모서리반경
+        // 곡률에 따라 형태를 압축 — 실제 반사처럼 실루엣 쪽에서 좁아지게
+        'float frontness = clamp(abs(Nb.z), 0.0, 1.0);\n' +
+        'vec2 sp = vec2(vObjPos.x / max(frontness, 0.34), vObjPos.y - 0.32);\n' +
+        'vec2 hs = vec2(0.30, 0.44); float rad = 0.20;\n' +
         'vec2 dd = abs(sp) - hs + rad;\n' +
         'float sdf = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0) - rad;\n' +
-        // 조명 방향(뷰 공간, 좌상단) 기반 음영 — 각 영역 안에 실제 그라데이션이 생기도록
+        // 조명 방향(뷰 공간, 좌상단) 기반 음영
         'vec3 Ldir = normalize(vec3(-0.35, 0.80, 0.48));\n' +
         'float ndl = clamp(dot(Nb, Ldir), 0.0, 1.0);\n' +
-        'float shade = mix(0.20, 1.0, ndl);\n' +                  // 0.2(그늘) ~ 1.0(광원쪽)
-        'float vGrad = smoothstep(-0.18, 0.72, vObjPos.y);\n' +   // 아래 어둡고 위 밝게
-        // 영역 마스크
-        'float innerDark = (1.0 - smoothstep(-0.20, -0.11, sdf)) * frontFace;\n' +
-        'float lightRing = smoothstep(-0.20, -0.13, sdf) * (1.0 - smoothstep(-0.08, -0.02, sdf)) * frontFace;\n' +
-        'float blackOutline = smoothstep(-0.04, 0.02, sdf) * (1.0 - smoothstep(0.09, 0.15, sdf)) * frontFace;\n' +
-        'float grayLine = smoothstep(0.15, 0.17, sdf) * (1.0 - smoothstep(0.20, 0.22, sdf)) * frontFace;\n' +
-        // 1) 중앙 블랙 — 아래는 거의 검정, 위는 밝은 회색으로 뚜렷한 그라데이션
-        'outgoingLight *= mix(1.0, mix(0.02, 0.38, shade * vGrad), innerDark);\n' +
-        // 2) 넓은 블랙 아웃라인 — 조명 방향에 따른 그라데이션 (옆면과 음영 구분)
-        'outgoingLight *= mix(1.0, mix(0.04, 0.32, shade), blackOutline);\n' +
-        // 3) #fafafa 반사광 링 — 네 방면을 감싸며 조명 방향으로 강한 대비
-        'outgoingLight += vec3(0.98, 0.98, 0.98) * lightRing * mix(0.45, 3.6, shade);\n' +
-        // 4) #bbbbbb 외곽선 — 음영 반영
-        'outgoingLight = mix(outgoingLight, vec3(0.5) * mix(0.6, 1.35, shade), grayLine * 0.55);\n' +
-        // 5) 옆면 크롬을 살짝 밝게 — 소프트박스 영역과의 대비 강화
-        'float sideMask = smoothstep(0.20, 0.30, sdf) * frontFace;\n' +
-        'outgoingLight *= mix(1.0, 1.18, sideMask);\n' +
+        'float shade = mix(0.20, 1.0, ndl);\n' +
+        'float vGrad = smoothstep(-0.18, 0.72, vObjPos.y);\n' +
+        // 영역 마스크 — 전이 폭을 크게 넓혀 반사처럼 번지게
+        'float innerDark = (1.0 - smoothstep(-0.26, -0.04, sdf)) * frontFace;\n' +
+        'float lightRing = smoothstep(-0.22, -0.08, sdf) * (1.0 - smoothstep(-0.02, 0.11, sdf)) * frontFace;\n' +
+        'float blackOutline = smoothstep(-0.02, 0.08, sdf) * (1.0 - smoothstep(0.15, 0.28, sdf)) * frontFace;\n' +
+        // 1) 중앙 어둠 — 완전히 뭉개지 않아 옆면 크롬의 환경 반사 결이 그대로 비침
+        'outgoingLight *= mix(1.0, mix(0.13, 0.48, shade * vGrad), innerDark);\n' +
+        // 2) 넓은 어두운 아웃라인 — 반사 결을 남기며 옆면과 구분
+        'outgoingLight *= mix(1.0, mix(0.22, 0.58, shade), blackOutline);\n' +
+        // 3) #fafafa 반사광 링 — 부드럽게 번지는 조명 반사
+        'outgoingLight += vec3(0.98, 0.98, 0.98) * lightRing * mix(0.25, 2.1, shade);\n' +
+        // 4) #bbbbbb 외곽선 — 아웃라인 바깥, 주변과 이어지도록 은은하게
+        'float grayLine = smoothstep(0.16, 0.22, sdf) * (1.0 - smoothstep(0.28, 0.36, sdf)) * frontFace;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(0.5) * mix(0.7, 1.3, shade), grayLine * 0.35);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
