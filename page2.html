@@ -1728,40 +1728,33 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
-        // ── 옆면: 아치형(위 radius 둥근 직사각) 소프트박스 — #bbbbbb 아웃라인 + 블랙 + 내부 4방 화이트 ──
+        // ── 옆면 질감 (사용자 SVG 설계 기반): 영역 분리 + 개별 블러 ──
         'float zf = vObjPos.z / max(length(vObjPos.xz), 1e-4);\n' +
         'float rrb = max(length(vObjPos.xz), 1e-4);\n' +
         'float ub = clamp(vObjPos.x / rrb, -1.0, 1.0);\n' +
-        'float yGate = smoothstep(-0.36, -0.24, vObjPos.y);\n' +
-        'float gN = smoothstep(-0.05, 0.25, zf) * yGate;\n' +
-        // 아치 좌표 (위 반원 + 아래 직사각) — 종 실루엣 따라가는 형태
-        'vec2 qa = vec2(ub / 1.00, (vObjPos.y - 0.18) / 0.82);\n' +
-        'float dTop = length(qa) - 1.0;\n' +
-        'float dBox = max(abs(qa.x) - 1.0, -qa.y - 1.20);\n' +
-        'float da = mix(dBox, dTop, step(0.0, qa.y));\n' +
-        // 내부 블랙 (조명 그림자 코어 — 소프트)
-        'float blackIn = (1.0 - smoothstep(-0.85, 0.55, da)) * gN;\n' +
-        'outgoingLight *= mix(1.0, 0.12, blackIn);\n' +
-        // #bbbbbb 아웃라인 (아치 경계 라인)
-        'float outl = (smoothstep(-0.10, 0.45, da) - smoothstep(0.35, 0.95, da)) * gN;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.55), clamp(outl, 0.0, 1.0) * 0.9);\n' +
-        // 블랙 내부 화이트 반사광 4개 (좌/우 굵게, 위 중간, 아래 제일 작게)
-        'float wLp = (1.0 - smoothstep(0.10, 0.75, abs(qa.x + 0.85))) * (1.0 - smoothstep(0.35, 1.10, abs(qa.y + 0.15)));\n' +
-        'float wRp = (1.0 - smoothstep(0.10, 0.75, abs(qa.x - 0.85))) * (1.0 - smoothstep(0.35, 1.10, abs(qa.y + 0.15)));\n' +
-        'float wTp = (1.0 - smoothstep(0.30, 1.00, abs(qa.x))) * (1.0 - smoothstep(0.12, 0.60, abs(qa.y - 0.85)));\n' +
-        'float wBp = (1.0 - smoothstep(0.12, 0.50, abs(qa.x))) * (1.0 - smoothstep(0.06, 0.32, abs(qa.y + 1.05)));\n' +
-        'float wSum = smoothstep(0.15, 0.75, clamp(wLp + wRp + wTp + wBp, 0.0, 1.0));\n' +
-        'outgoingLight = mix(outgoingLight, vec3(3.2), wSum * gN);\n' +
-        // 아치 밑 블랙 타원 라인 (아웃라인 굴곡과 이어짐, 옆면 너비 ~10% 선)
-        'float be = length(vec2(qa.x / 1.06, (qa.y + 1.22) / 0.30));\n' +
-        'float bLine = (smoothstep(0.60, 1.0, be) - smoothstep(1.10, 1.70, be)) * gN;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.05), clamp(bLine, 0.0, 1.0) * 0.85);\n' +
-        // 볼록(립) 윗부분 회색 경계선 — 종 곡률 따라 타원
-        'float lipLine = smoothstep(-0.33, -0.29, vObjPos.y) * (1.0 - smoothstep(-0.27, -0.23, vObjPos.y)) * smoothstep(-0.2, 0.1, zf);\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.42), lipLine * 0.8);\n' +
-        // 하단 납작 타원 화이트 (립 윗면 앞쪽)
-        'float lipY = smoothstep(-0.52, -0.42, vObjPos.y) * (1.0 - smoothstep(-0.34, -0.24, vObjPos.y));\n' +
-        'outgoingLight = mix(outgoingLight, vec3(2.6), lipY * smoothstep(0.15, 0.55, zf) * 0.8);\n' +
+        'float gN = smoothstep(-0.05, 0.25, zf) * smoothstep(-0.30, -0.20, vObjPos.y);\n' +
+        // 1) 돔 베이스: 우측 #353535 → 좌측 #9B9B9B 그라데이션 (블랙 영역 크게)
+        'float gradLR = smoothstep(-0.85, 0.55, ub);\n' +
+        'outgoingLight *= mix(1.0, mix(0.92, 0.20, gradLR), gN);\n' +
+        // 2) 좌측 화이트 세로 기둥 (blur15)
+        'float wCol1 = (1.0 - smoothstep(0.08, 0.30, abs(ub + 0.45))) * (1.0 - smoothstep(0.28, 0.72, abs(vObjPos.y - 0.28)));\n' +
+        // 3) 우측 화이트 세로 기둥 (blur20, 더 소프트, 분리)
+        'float wCol2 = (1.0 - smoothstep(0.06, 0.34, abs(ub - 0.38))) * (1.0 - smoothstep(0.26, 0.78, abs(vObjPos.y - 0.30)));\n' +
+        // 4) 상단 아치 곡선 하이라이트 (돔 굴곡 따라, blur10)
+        'float wArc = (1.0 - smoothstep(0.06, 0.26, abs(vObjPos.y - 0.80))) * (1.0 - smoothstep(0.45, 0.85, abs(ub)));\n' +
+        // 5) 중하부 납작 타원 (blur10)
+        'float wEll = 1.0 - smoothstep(0.45, 1.05, length(vec2(ub / 0.55, (vObjPos.y + 0.02) / 0.11)));\n' +
+        // 6) 우측 소형 타원 (blur10)
+        'float wSm = 1.0 - smoothstep(0.45, 1.05, length(vec2((ub - 0.56) / 0.22, (vObjPos.y + 0.05) / 0.15)));\n' +
+        'float wAll = smoothstep(0.18, 0.70, clamp(wCol1 + wCol2 + wArc + wEll + wSm, 0.0, 1.0));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.2), wAll * gN);\n' +
+        // 7) 스커트 존: 별도 다크 그라데이션 (돔과 분리)
+        'float skirtG = smoothstep(-0.58, -0.46, vObjPos.y) * (1.0 - smoothstep(-0.32, -0.24, vObjPos.y)) * smoothstep(-0.05, 0.25, zf);\n' +
+        'outgoingLight *= mix(1.0, mix(0.92, 0.28, gradLR), skirtG);\n' +
+        // 8) 스커트 얇은 화이트 타원 라인들 (blur2.5~5)
+        'float sl1 = (1.0 - smoothstep(0.025, 0.06, abs(vObjPos.y + 0.38))) * (1.0 - smoothstep(0.42, 0.80, abs(ub)));\n' +
+        'float sl2 = (1.0 - smoothstep(0.02, 0.05, abs(vObjPos.y + 0.47))) * (1.0 - smoothstep(0.30, 0.62, abs(ub + 0.18)));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.8), clamp(sl1 + sl2, 0.0, 1.0) * smoothstep(-0.05, 0.25, zf) * 0.8);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
