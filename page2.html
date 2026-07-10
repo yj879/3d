@@ -1728,6 +1728,27 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
+        // ── 옆면 섹션 셰이딩 (레퍼런스): 좌 화이트 스트립 / 중앙 블랙(굴곡 따라) / 우 화이트 / 우측 다크 ──
+        'float yGate = smoothstep(-0.36, -0.26, vObjPos.y);\n' +
+        'float rr = max(length(vObjPos.xz), 1e-4);\n' +
+        'float uu = clamp(vObjPos.x / rr, -1.0, 1.0);\n' +
+        'float zf = vObjPos.z / rr;\n' +
+        'float g = smoothstep(-0.1, 0.2, zf) * yGate;\n' +
+        // 좌측 세로 화이트 스트립 (실루엣 안쪽)
+        'float wL = smoothstep(-0.88, -0.76, uu) * (1.0 - smoothstep(-0.56, -0.44, uu));\n' +
+        // 중앙 블랙 밴드 — u 기반이라 종 굴곡 따라 휘어짐
+        'float dC = smoothstep(-0.40, -0.26, uu) * (1.0 - smoothstep(0.04, 0.18, uu));\n' +
+        // 중앙-우 화이트 브로드
+        'float wR = smoothstep(0.14, 0.28, uu) * (1.0 - smoothstep(0.56, 0.74, uu));\n' +
+        // 우측 다크 폴오프
+        'float dR = smoothstep(0.76, 0.94, uu);\n' +
+        'outgoingLight *= mix(1.0, 0.10, dC * g);\n' +
+        'outgoingLight *= mix(1.0, 0.30, dR * g);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.0), wL * g * 0.95);\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.8), wR * g * 0.85);\n' +
+        // 하단 납작 타원 화이트 (립 윗면 앞쪽)
+        'float lipY = smoothstep(-0.52, -0.42, vObjPos.y) * (1.0 - smoothstep(-0.34, -0.24, vObjPos.y));\n' +
+        'outgoingLight = mix(outgoingLight, vec3(2.6), lipY * smoothstep(0.15, 0.55, zf) * 0.8);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
