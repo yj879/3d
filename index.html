@@ -1736,14 +1736,15 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         // 1) 돔 베이스: 우측 #353535 → 좌측 #9B9B9B 그라데이션 (블랙 영역 크게)
         'float gradLR = smoothstep(-0.85, 0.55, ub);\n' +
         'outgoingLight *= mix(1.0, mix(0.92, 0.20, gradLR), gN);\n' +
-        // 2) 좌측 화이트 세로 기둥 (blur15)
-        'float wCol1 = (1.0 - smoothstep(0.08, 0.30, abs(ub + 0.45))) * (1.0 - smoothstep(0.28, 0.72, abs(vObjPos.y - 0.28)));\n' +
-        // 3) 우측 화이트 세로 기둥 (blur20, 더 소프트, 분리)
-        'float wCol2 = (1.0 - smoothstep(0.06, 0.34, abs(ub - 0.38))) * (1.0 - smoothstep(0.26, 0.78, abs(vObjPos.y - 0.30)));\n' +
-        // 4) 상단 아치 곡선 하이라이트 (돔 굴곡 따라, blur10)
-        'float wArc = (1.0 - smoothstep(0.06, 0.26, abs(vObjPos.y - 0.80))) * (1.0 - smoothstep(0.45, 0.85, abs(ub)));\n' +
-        // 감싸는 반사광만 (내부 타원 제거) — 코어 순백, 가장자리 그라데이션 페이드
-        'float wAll = clamp(wCol1 + wCol2 + wArc, 0.0, 1.0);\n' +
+        // 2) 중앙 블랙 존: 크고 진하게 (외곽 블러)
+        'float bz = 1.0 - smoothstep(0.30, 1.15, length(vec2(ub / 0.62, (vObjPos.y - 0.20) / 0.72)));\n' +
+        'outgoingLight *= mix(1.0, 0.08, bz * gN);\n' +
+        // 3) 화이트 4등분: 상하좌우 대각선 배치 (블랙 감싸는 4코너, 외곽 블러)
+        'float dw1 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub + 0.60) / 0.40, (vObjPos.y - 0.72) / 0.38)));\n' +
+        'float dw2 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub - 0.60) / 0.40, (vObjPos.y - 0.72) / 0.38)));\n' +
+        'float dw3 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub + 0.66) / 0.38, (vObjPos.y + 0.26) / 0.36)));\n' +
+        'float dw4 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub - 0.66) / 0.38, (vObjPos.y + 0.26) / 0.36)));\n' +
+        'float wAll = clamp(dw1 + dw2 + dw3 + dw4, 0.0, 1.0);\n' +
         'outgoingLight = mix(outgoingLight, vec3(4.5), pow(wAll, 0.85) * gN);\n' +
         // 7) 스커트 존: 별도 다크 그라데이션 (돔과 분리)
         'float skirtG = smoothstep(-0.58, -0.46, vObjPos.y) * (1.0 - smoothstep(-0.32, -0.24, vObjPos.y)) * smoothstep(-0.05, 0.25, zf);\n' +
