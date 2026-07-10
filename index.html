@@ -1740,10 +1740,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float bz = 1.0 - smoothstep(0.30, 1.15, length(vec2(ub / 0.62, (vObjPos.y - 0.20) / 0.72)));\n' +
         'outgoingLight *= mix(1.0, 0.08, bz * gN);\n' +
         // 3) 화이트 4등분: 상하좌우 대각선 배치 (블랙 감싸는 4코너, 외곽 블러)
-        'float dw1 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub + 0.60) / 0.26, (vObjPos.y - 0.84) / 0.40)));\n' +
-        'float dw2 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub - 0.60) / 0.26, (vObjPos.y - 0.84) / 0.40)));\n' +
-        'float dw3 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub + 0.66) / 0.24, (vObjPos.y + 0.38) / 0.38)));\n' +
-        'float dw4 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub - 0.66) / 0.24, (vObjPos.y + 0.38) / 0.38)));\n' +
+        'float dw1 = 1.0 - smoothstep(0.05, 1.38, length(vec2(ub / 0.30, (vObjPos.y - 0.92) / 0.20)));\n' +
+        'float dw2 = 1.0 - smoothstep(0.05, 1.38, length(vec2(ub / 0.26, (vObjPos.y + 0.52) / 0.15)));\n' +
+        'float dw3 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub + 0.72) / 0.10, (vObjPos.y - 0.20) / 0.60)));\n' +
+        'float dw4 = 1.0 - smoothstep(0.05, 1.38, length(vec2((ub - 0.72) / 0.10, (vObjPos.y - 0.20) / 0.60)));\n' +
         'float wAll = clamp(dw1 + dw2 + dw3 + dw4, 0.0, 1.0);\n' +
         // 원통 윤곽: 측면 노멀일수록 강해져 곡면을 감아 도는 하이라이트
         'vec3 NfH = Nb.z < 0.0 ? -Nb : Nb;\n' +
