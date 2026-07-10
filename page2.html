@@ -1740,10 +1740,10 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float bz = 1.0 - smoothstep(0.30, 1.15, length(vec2(ub / 0.62, (vObjPos.y - 0.20) / 0.72)));\n' +
         'outgoingLight *= mix(1.0, 0.08, bz * gN);\n' +
         // 3) 화이트 4등분: 상하좌우 대각선 배치 (블랙 감싸는 4코너, 외곽 블러)
-        'float dw1 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub + 0.60) / 0.40, (vObjPos.y - 0.72) / 0.38)));\n' +
-        'float dw2 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub - 0.60) / 0.40, (vObjPos.y - 0.72) / 0.38)));\n' +
-        'float dw3 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub + 0.66) / 0.38, (vObjPos.y + 0.26) / 0.36)));\n' +
-        'float dw4 = 1.0 - smoothstep(0.10, 0.95, length(vec2((ub - 0.66) / 0.38, (vObjPos.y + 0.26) / 0.36)));\n' +
+        'float dw1 = 1.0 - smoothstep(0.05, 1.25, length(vec2((ub + 0.60) / 0.34, (vObjPos.y - 0.74) / 0.62)));\n' +
+        'float dw2 = 1.0 - smoothstep(0.05, 1.25, length(vec2((ub - 0.60) / 0.34, (vObjPos.y - 0.74) / 0.62)));\n' +
+        'float dw3 = 1.0 - smoothstep(0.05, 1.25, length(vec2((ub + 0.66) / 0.32, (vObjPos.y + 0.28) / 0.58)));\n' +
+        'float dw4 = 1.0 - smoothstep(0.05, 1.25, length(vec2((ub - 0.66) / 0.32, (vObjPos.y + 0.28) / 0.58)));\n' +
         'float wAll = clamp(dw1 + dw2 + dw3 + dw4, 0.0, 1.0);\n' +
         'outgoingLight = mix(outgoingLight, vec3(4.5), pow(wAll, 0.85) * gN);\n' +
         // 7) 스커트 존: 별도 다크 그라데이션 (돔과 분리)
