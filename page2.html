@@ -1728,34 +1728,33 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'vec3 Nb = normalize(vNormal);\n' +
         'float bb = pow(max(dot(Nb, uBadgeDir), 0.0), 5.0);\n' +
         'outgoingLight += uBadgeCol * bb * 0.35;\n' +
-        // ── 앞면 소프트박스(원형 사각형) ──
-        // 안→밖: 중앙 블랙 그라데이션 → #fafafa 반사광(네 방면 감쌈) → 넓은 블랙 아웃라인 → #bbbbbb 외곽선
-        'float yGate = smoothstep(-0.34, -0.26, vObjPos.y);\n' +            // 아래 extrude(플레어) 침범 방지
+        // ── 앞면 소프트박스: 종 실루엣을 따라가는 형태 (직사각형 아님) ──
+        // 밖→안: 종 모양 짙은 회색 아웃라인 → 간격 → 흰 반사광 링(네 방면서 떨어짐) → 중앙 어둠
+        'float yGate = smoothstep(-0.36, -0.28, vObjPos.y);\n' +            // 아래 extrude(플레어) 침범 방지
         'float frontFace = smoothstep(0.02, 0.28, vObjPos.z) * yGate;\n' +  // 앞면만
-        // 곡률에 따라 형태를 압축 — 실제 반사처럼 실루엣 쪽에서 좁아지게
-        'float frontness = clamp(abs(Nb.z), 0.0, 1.0);\n' +
-        'vec2 sp = vec2(vObjPos.x / max(frontness, 0.34), vObjPos.y - 0.32);\n' +
-        'vec2 hs = vec2(0.30, 0.44); float rad = 0.20;\n' +
-        'vec2 dd = abs(sp) - hs + rad;\n' +
-        'float sdf = length(max(dd, 0.0)) + min(max(dd.x, dd.y), 0.0) - rad;\n' +
+        // 가로를 "그 높이의 종 반지름"으로 정규화 → 형태가 종 실루엣을 따라감 (아래 넓고 위 좁게)
+        'float rr = max(length(vObjPos.xz), 1e-4);\n' +
+        'float u = clamp(vObjPos.x / rr, -1.0, 1.0);\n' +                   // 0=정면중앙, ±1=실루엣
+        // 정규화 박스 (영역 확대): 가로 ±0.92(캡처한 바깥 회색선 위치), 세로 0.30±0.52
+        'vec2 q = vec2(u / 0.92, (vObjPos.y - 0.30) / 0.52);\n' +
+        // 스쿼클(superellipse) 거리 — 내부 등고선까지 둥글어 각진 사각형이 안 생김
+        'vec2 aq = abs(q);\n' +
+        'float m = pow(pow(aq.x, 3.0) + pow(aq.y, 3.0), 0.33333333);\n' +
+        'float sdfN = m - 1.0;\n' +                                                 // 중앙 -1.0, 경계 0
         // 조명 방향(뷰 공간, 좌상단) 기반 음영
         'vec3 Ldir = normalize(vec3(-0.35, 0.80, 0.48));\n' +
         'float ndl = clamp(dot(Nb, Ldir), 0.0, 1.0);\n' +
-        'float shade = mix(0.20, 1.0, ndl);\n' +
-        'float vGrad = smoothstep(-0.18, 0.72, vObjPos.y);\n' +
-        // 영역 마스크 — 전이 폭을 크게 넓혀 반사처럼 번지게
-        'float innerDark = (1.0 - smoothstep(-0.26, -0.04, sdf)) * frontFace;\n' +
-        'float lightRing = smoothstep(-0.22, -0.08, sdf) * (1.0 - smoothstep(-0.02, 0.11, sdf)) * frontFace;\n' +
-        'float blackOutline = smoothstep(-0.02, 0.08, sdf) * (1.0 - smoothstep(0.15, 0.28, sdf)) * frontFace;\n' +
-        // 1) 중앙 어둠 — 완전히 뭉개지 않아 옆면 크롬의 환경 반사 결이 그대로 비침
-        'outgoingLight *= mix(1.0, mix(0.13, 0.48, shade * vGrad), innerDark);\n' +
-        // 2) 넓은 어두운 아웃라인 — 반사 결을 남기며 옆면과 구분
-        'outgoingLight *= mix(1.0, mix(0.22, 0.58, shade), blackOutline);\n' +
-        // 3) #fafafa 반사광 링 — 부드럽게 번지는 조명 반사
-        'outgoingLight += vec3(0.98, 0.98, 0.98) * lightRing * mix(0.25, 2.1, shade);\n' +
-        // 4) #bbbbbb 외곽선 — 아웃라인 바깥, 주변과 이어지도록 은은하게
-        'float grayLine = smoothstep(0.16, 0.22, sdf) * (1.0 - smoothstep(0.28, 0.36, sdf)) * frontFace;\n' +
-        'outgoingLight = mix(outgoingLight, vec3(0.5) * mix(0.7, 1.3, shade), grayLine * 0.35);\n' +
+        'float shade = mix(0.25, 1.0, ndl);\n' +
+        // 영역 마스크 (종 모양 정규화 SDF)
+        'float centerDark = (1.0 - smoothstep(-0.62, -0.48, sdfN)) * frontFace;\n' +
+        'float lightRing = smoothstep(-0.60, -0.46, sdfN) * (1.0 - smoothstep(-0.34, -0.20, sdfN)) * frontFace;\n' +
+        'float outlineBand = smoothstep(-0.16, -0.07, sdfN) * (1.0 - smoothstep(0.02, 0.10, sdfN)) * frontFace;\n' +
+        // 1) 중앙 어둠 — 곱연산으로 반사 결 보존
+        'outgoingLight *= mix(1.0, mix(0.16, 0.42, shade), centerDark);\n' +
+        // 2) 종 모양 짙은 회색 아웃라인 — 바깥 회색과 어울리게
+        'outgoingLight *= mix(1.0, mix(0.34, 0.62, shade), outlineBand);\n' +
+        // 3) 흰 반사광 링 — 훨씬 화이트, 네 방면에서 떨어져 있음
+        'outgoingLight += vec3(1.0, 1.0, 1.0) * lightRing * mix(0.9, 3.4, shade);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
