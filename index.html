@@ -1739,13 +1739,11 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         // 중앙 어둠: 경계 없이 가장자리로 넓게 퍼짐 (하드 구분 없음)
         'float centerDark = (1.0 - smoothstep(-0.75, 0.55, m - 1.0)) * frontFace;\n' +
         'outgoingLight *= mix(1.0, 0.20, centerDark);\n' +
-        // 검정 안, 사방에 띄엄띄엄 놓인 큼직한 화이트 반사 패치 (소프트)
-        'float w1 = 1.0 - smoothstep(0.0, 0.55, length(q - vec2(-0.52, 0.55)));\n' +
-        'float w2 = 1.0 - smoothstep(0.0, 0.55, length(q - vec2(0.55, 0.45)));\n' +
-        'float w3 = 1.0 - smoothstep(0.0, 0.55, length(q - vec2(-0.50, -0.50)));\n' +
-        'float w4 = 1.0 - smoothstep(0.0, 0.55, length(q - vec2(0.52, -0.55)));\n' +
-        'float wp = pow(max(max(w1, w2), max(w3, w4)), 1.6);\n' +
-        'outgoingLight += vec3(1.0) * wp * centerDark * 2.2;\n' +
+        // 종 옆면을 감싸는 두꺼운 세로 화이트 밴드 (거의 #ffffff, 좌우) — 중앙 블랙엔 반사 없음
+        'float au = abs(u);\n' +
+        'float sideWrap = smoothstep(0.30, 0.44, au) * (1.0 - smoothstep(0.93, 1.0, au));\n' +
+        'float sideGate = smoothstep(-0.04, 0.10, vObjPos.z) * yGate;\n' +
+        'outgoingLight = mix(outgoingLight, vec3(3.0), sideWrap * sideGate * 0.92);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
         'float frEdge = pow(1.0 - abs(dot(Nb, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
         'outgoingLight += vec3(0.88, 0.88, 0.88) * frEdge * 0.9;\n' +
@@ -1771,8 +1769,8 @@ function makeBell2SmallChrome(darkMode) {
     clearcoatRoughness: 0.12,
     envMapIntensity: 1.5,
   });
-  const lo  = darkMode ? '0.12' : '0.30';
-  const mid = darkMode ? '0.30' : '0.55';
+  const lo  = darkMode ? '0.06' : '0.30';
+  const mid = darkMode ? '0.50' : '0.55';
   const tr  = darkMode ? 'smoothstep(0.52, 0.88, gg)' : 'smoothstep(0.25, 0.72, gg)';
   mat.onBeforeCompile = function(shader) {
     shader.fragmentShader = shader.fragmentShader.replace(
@@ -1782,7 +1780,7 @@ function makeBell2SmallChrome(darkMode) {
       'float baseMul = mix(' + lo + ', ' + mid + ', ' + tr + ');\n' +
       'float hot = pow(max(Ns.y, 0.0), 14.0);\n' +
       'float frS = pow(1.0 - abs(dot(Ns, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
-      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85 + vec3(0.88) * frS * 0.9;\n' +
+      'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 1.2 + vec3(0.88) * frS * 0.9;\n' +
       '#include <output_fragment>'
     );
   };
