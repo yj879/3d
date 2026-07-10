@@ -1736,7 +1736,7 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float rr = max(length(vObjPos.xz), 1e-4);\n' +
         'float u = clamp(vObjPos.x / rr, -1.0, 1.0);\n' +                   // 0=정면중앙, ±1=실루엣
         // 정규화 박스 (영역 확대): 가로 ±0.92(캡처한 바깥 회색선 위치), 세로 0.30±0.52
-        'vec2 q = vec2(u / 0.92, (vObjPos.y - 0.30) / 0.52);\n' +
+        'vec2 q = vec2(u / 0.92, (vObjPos.y - 0.28) / 0.64);\n' +
         // 스쿼클(superellipse) 거리 — 내부 등고선까지 둥글어 각진 사각형이 안 생김
         'vec2 aq = abs(q);\n' +
         'float m = pow(pow(aq.x, 3.0) + pow(aq.y, 3.0), 0.33333333);\n' +
@@ -1750,9 +1750,13 @@ function makeBell2MetalMaterial(withBadgeBounce) {
         'float lightRing = smoothstep(-0.60, -0.46, sdfN) * (1.0 - smoothstep(-0.34, -0.20, sdfN)) * frontFace;\n' +
         'float outlineBand = smoothstep(-0.16, -0.07, sdfN) * (1.0 - smoothstep(0.02, 0.10, sdfN)) * frontFace;\n' +
         // 1) 중앙 어둠 — 곱연산으로 반사 결 보존
-        'outgoingLight *= mix(1.0, mix(0.16, 0.42, shade), centerDark);\n' +
+        'outgoingLight *= mix(1.0, mix(0.28, 0.50, shade), centerDark);\n' +
+        // 최중심 코어: 한 단계 더 눌러 블랙 (진회색→블랙 2단 그라데이션)
+        'float coreB = (1.0 - smoothstep(-0.94, -0.76, sdfN)) * frontFace;\n' +
+        'outgoingLight *= mix(1.0, 0.40, coreB);\n' +
         // 2) 종 모양 짙은 회색 아웃라인 — 바깥 회색과 어울리게
-        'outgoingLight *= mix(1.0, mix(0.34, 0.62, shade), outlineBand);\n' +
+        'float lowBlend = smoothstep(0.55, -0.30, vObjPos.y);\n' +
+        'outgoingLight *= mix(1.0, mix(0.34, 0.62, shade), outlineBand * (0.55 + 0.45 * lowBlend));\n' +
         // 3) 흰 반사광 링 — 훨씬 화이트, 네 방면에서 떨어져 있음
         'outgoingLight += vec3(1.0, 1.0, 1.0) * lightRing * mix(0.9, 3.4, shade);\n' +
         // 기존 프레넬 엣지/바닥 반사 유지
@@ -1780,14 +1784,15 @@ function makeBell2SmallChrome(darkMode) {
     clearcoatRoughness: 0.12,
     envMapIntensity: 1.5,
   });
-  const lo  = darkMode ? '0.14' : '0.30';
-  const mid = darkMode ? '0.32' : '0.55';
+  const lo  = darkMode ? '0.12' : '0.30';
+  const mid = darkMode ? '0.30' : '0.55';
+  const tr  = darkMode ? 'smoothstep(0.52, 0.88, gg)' : 'smoothstep(0.25, 0.72, gg)';
   mat.onBeforeCompile = function(shader) {
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <output_fragment>',
       'vec3 Ns = normalize(vNormal);\n' +
       'float gg = clamp(Ns.y * 0.5 + 0.5, 0.0, 1.0);\n' +
-      'float baseMul = mix(' + lo + ', ' + mid + ', smoothstep(0.25, 0.72, gg));\n' +
+      'float baseMul = mix(' + lo + ', ' + mid + ', ' + tr + ');\n' +
       'float hot = pow(max(Ns.y, 0.0), 14.0);\n' +
       'float frS = pow(1.0 - abs(dot(Ns, vec3(0.0, 0.0, 1.0))), 2.6);\n' +
       'outgoingLight = outgoingLight * baseMul + vec3(1.0) * hot * 0.85 + vec3(0.88) * frS * 0.9;\n' +
